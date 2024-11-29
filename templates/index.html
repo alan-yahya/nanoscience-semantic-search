@@ -51,9 +51,20 @@
         return doi;
     }
 
+    function isValidResult(result) {
+        // Check if title exists and is not empty array
+        if (!result.title || result.title === '[]' || result.title.length === 0) return false;
+        // Check if DOI exists and is not empty
+        if (!result.doi || result.doi === '[]' || result.doi.length === 0) return false;
+        return true;
+    }
+
     function removeDuplicates(results) {
         const seen = new Set();
         return results.filter(result => {
+            // First check if result is valid
+            if (!isValidResult(result)) return false;
+            
             const key = `${result.title}-${result.doi}`;
             if (seen.has(key)) return false;
             seen.add(key);
@@ -95,7 +106,7 @@
             if (data.error) {
                 assistantDiv.textContent = `Error: ${data.error}`;
             } else {
-                // Remove duplicates before formatting
+                // Remove duplicates and invalid results before formatting
                 const uniqueResults = removeDuplicates(data.results);
                 
                 // Format the results with line breaks and hyperlinks
