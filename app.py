@@ -28,7 +28,7 @@ class NanoBERTSearchEngine:
         if not self.hf_api_key:
             raise ValueError("Hugging Face API Key is required. Set HF_API_KEY environment variable.")
         
-        print(f"Initializing with model: {model_name}")
+        print(f"\nInitializing with model: {model_name}")
         self.model_name = model_name
         self.inference_url = f"https://api-inference.huggingface.co/models/{model_name}"
         
@@ -188,46 +188,81 @@ class NanoBERTSearchEngine:
     def search(self, query, top_k=5):
         try:
             query_vector = self.encode_text(query)
-            D, I = self.index.search(query_vector, top_k * 2)  # Get more results initially
             
-            # Create a set to track unique results
-            seen_results = set()
-            results = []
+            # Get more results initially
+            D, I = self.index.search(query_vector, top_k * 5)  # Increased multiplier
+            
+            print("\nRaw search results:")
+            for d, i in zip(D[0], I[0]):
+                print(f"Distance: {d}, Index: {i}")
+            
+            # Create a dictionary to track unique results by DOI and paragraph
+            unique_results = {}
             
             # Process results and remove duplicates
             for distance, idx in zip(D[0], I[0]):
-                if idx == -1:  # Skip invalid results
+                if idx == -1:
+                    print(f"Skipping invalid index: {idx}")
                     continue
-                
-                # Convert numpy.int64 to regular Python int
+                    
                 idx = int(idx)
                 
-                # Skip indices that aren't in metadata
                 if idx not in self.metadata:
                     print(f"Warning: Index {idx} not found in metadata")
                     continue
                 
                 metadata_entry = self.metadata[idx]
+                doi = metadata_entry['doi']
+                paragraph_id = metadata_entry['paragraph_id']
                 
-                # Create a unique key from the title and DOI
-                unique_key = (metadata_entry['title'], metadata_entry['doi'])
+                # Create a unique key combining DOI and paragraph_id
+                unique_key = f"{doi}_{paragraph_id}"
                 
-                # Only add if we haven't seen this result before
-                if unique_key not in seen_results:
-                    seen_results.add(unique_key)
-                    results.append({
+                print(f"\nProcessing result:")
+                print(f"Index: {idx}")
+                print(f"Distance: {distance}")
+                print(f"DOI: {doi}")
+                print(f"Paragraph ID: {paragraph_id}")
+                print(f"Title: {metadata_entry['title']}")
+                
+                # Only keep if it's a new DOI or a better match for this paragraph
+                if unique_key not in unique_results or distance < unique_results[unique_key]['distance']:
+                    unique_results[unique_key] = {
                         'distance': float(distance),
-                        'paragraph_id': metadata_entry['paragraph_id'],
-                        'doi': metadata_entry['doi'],
                         'title': metadata_entry['title'],
+                        'doi': doi,
+                        'paragraph_id': paragraph_id,
                         'chunk_id': metadata_entry['chunk_id']
-                    })
-                    
-                    # Break if we have enough unique results
-                    if len(results) >= top_k:
+                    }
+                
+                # Break if we have enough unique results
+                if len(unique_results) >= top_k:
+                    # Check if we have enough different DOIs
+                    unique_dois = len(set(r['doi'] for r in unique_results.values()))
+                    if unique_dois >= top_k:
                         break
             
-            return results
+            # Convert dictionary to list and sort by distance
+            results = list(unique_results.values())
+            results.sort(key=lambda x: x['distance'])
+            
+            # Group by DOI and take the best result for each
+            doi_results = {}
+            for result in results:
+                doi = result['doi']
+                if doi not in doi_results or result['distance'] < doi_results[doi]['distance']:
+                    doi_results[doi] = result
+            
+            # Final results sorted by distance
+            final_results = list(doi_results.values())
+            final_results.sort(key=lambda x: x['distance'])
+            final_results = final_results[:top_k]
+            
+            print(f"\nFinal results:")
+            for r in final_results:
+                print(f"Distance: {r['distance']}, DOI: {r['doi']}, Paragraph: {r['paragraph_id']}")
+            
+            return final_results
             
         except Exception as e:
             print(f"Error in search method: {str(e)}")
@@ -328,4 +363,12 @@ def add_header(response):
 
 # For Coolify deployment
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Run the Flask app
+    port = int(os.environ.get('PORT', 3000))
+    host = os.environ.get('HOST', '0.0.0.0')
+    
+    app.run(
+        host=host,
+        port=port,
+        debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    )

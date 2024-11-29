@@ -1,16 +1,16 @@
 const FAQPage = () => {
     const faqs = [
         {
-            question: "What is NanoBERT Search?",
-            answer: "NanoBERT Search is a specialized semantic search engine designed for nanoscience papers. It uses custom embeddings from NanoBERT to understand and retrieve relevant scientific papers based on natural language queries."
+            question: "What is NanoSearch?",
+            answer: "NanoSearch is a specialized search engine for nanoscience papers. It uses embeddings from a custom pre-trained language model to retrieve relevant nanoscience papers, rather than a keyword-based or lexical search."
         },
         {
-            question: "How does it work?",
-            answer: "The system uses NanoBERT, a BERT model fine-tuned on nanoscience literature, to convert search queries into vector representations. These are then compared with pre-computed paper embeddings using FAISS (Facebook AI Similarity Search) to find the most semantically relevant papers."
+            question: "What does it use?",
+            answer: `The database uses custom embeddings from <a href="https://huggingface.co/Flamenco43/NanoBERT-V2" target="_blank" style="color: #3498db; text-decoration: none;">NanoBERT</a> to resolve similar Nanoscience papers. It leverages the <a href="https://huggingface.co/docs/api-inference/en/index" target="_blank" style="color: #3498db; text-decoration: none;">Hugging Face Inference API</a> and <a href="https://github.com/facebookresearch/faiss" target="_blank" style="color: #3498db; text-decoration: none;">FAISS</a> for a hybrid sparse and dense vector search.`
         },
         {
             question: "What kind of papers are included?",
-            answer: "The database includes peer-reviewed papers from the field of nanoscience and nanotechnology. The papers cover various topics including materials science, quantum physics, and molecular engineering at the nanoscale."
+            answer: "The database includes peer-reviewed papers from the field of nanoscience and nanotechnology. The papers cover various topics including materials science, quantum physics. At the moment, only RSC journals are included."
         },
         {
             question: "How accurate are the search results?",
@@ -36,7 +36,11 @@ const FAQPage = () => {
                         { key: index, className: 'faq-item mb-4' },
                         [
                             React.createElement('h2', { className: 'h4 mb-3', key: 'q' }, faq.question),
-                            React.createElement('p', { className: 'text-muted', key: 'a' }, faq.answer)
+                            React.createElement('p', { 
+                                className: 'text-muted', 
+                                key: 'a',
+                                dangerouslySetInnerHTML: { __html: faq.answer }
+                            })
                         ]
                     )
                 )

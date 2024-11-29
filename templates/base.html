@@ -22,6 +22,17 @@
         /* Add custom navbar styles */
         .navbar {
             padding: 1rem 0;  /* Increase vertical padding */
+            background-color: #e3e6e9;  /* Slightly darker than bg-light (which is #f8f9fa) */
+            position: fixed;  /* Make navbar fixed */
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;  /* Ensure navbar stays on top */
+        }
+        
+        /* Add padding to account for fixed navbar */
+        body {
+            padding-top: 56px;
         }
         
         .navbar .container-fluid {
@@ -32,6 +43,17 @@
         .navbar-brand {
             font-size: 1.75rem;  /* Make title bigger */
             font-weight: 600;     /* Make it bolder */
+            display: flex;
+            align-items: center;
+            gap: 0.125rem;  /* Reduce gap between items */
+        }
+        
+        /* Favicon styles */
+        .navbar-brand img, 
+        .navbar-brand svg {
+            width: 32px;  /* Increase favicon size */
+            height: 32px;
+            margin-right: 0.1rem;  /* Reduce margin after logo */
         }
         
         /* Adjust nav links to match brand */
@@ -43,9 +65,12 @@
 </head>
 <body>
     <!-- Update navbar structure -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">NanoSearch</a>
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='favicon.svg') }}" alt="NanoSearch Logo">
+                NanoSearch
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
