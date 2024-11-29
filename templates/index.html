@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Database Stats Card -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Database Statistics</h5>
+                <p class="card-text">
+                    Number of FAISS Vectors: {{ faiss_count }}
+                </p>
+                <p class="card-text">
+                    Vector Dimensions: {{ vector_dim }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chat Interface -->
+<div class="row mt-4">
+    <div class="col">
+        <div class="chat-container" id="chatContainer">
+            <!-- Chat messages will be dynamically added here -->
+        </div>
+        
+        <div class="input-group mt-3">
+            <input type="text" id="userInput" class="form-control" placeholder="Type your message...">
+            <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function sendMessage() {
+        const userInput = document.getElementById('userInput');
+        const chatContainer = document.getElementById('chatContainer');
+        const query = userInput.value.trim();
+        
+        if (!query) return;
+
+        console.log('Sending query:', query);  // Debug log
+
+        // Add user message to chat
+        const userDiv = document.createElement('div');
+        userDiv.className = 'user-message';
+        userDiv.textContent = query;
+        chatContainer.appendChild(userDiv);
+        
+        // Clear input
+        userInput.value = '';
+
+        const requestData = {
+            query: query,
+            top_k: 5
+        };
+        console.log('Request data:', requestData);  // Debug log
+
+        // Send request to backend
+        fetch('/search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => {
+            console.log('Response status:', response.status);  // Debug log
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);  // Debug log
+            // Create response message
+            const assistantDiv = document.createElement('div');
+            assistantDiv.className = 'assistant-message';
+            
+            if (data.error) {
+                assistantDiv.textContent = `Error: ${data.error}`;
+            } else {
+                // Format the results
+                const results = data.results.map(result => 
+                    `Title: ${result.title}\nDOI: ${result.doi}\nDistance: ${result.distance.toFixed(4)}`
+                ).join('\n\n');
+                
+                assistantDiv.textContent = results || 'No results found';
+            }
+            
+            chatContainer.appendChild(assistantDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);  // Debug log
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'assistant-message';
+            errorDiv.textContent = 'Error: Could not complete the search';
+            chatContainer.appendChild(errorDiv);
+        });
+    }
+
+    // Add event listener for Enter key
+    document.getElementById('userInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+</script>
+{% endblock %} 
