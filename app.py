@@ -328,12 +328,4 @@ def add_header(response):
 
 # For Coolify deployment
 if __name__ == '__main__':
-    # Run the Flask app
-    port = int(os.environ.get('PORT', 3000))
-    host = os.environ.get('HOST', '0.0.0.0')
-    
-    app.run(
-        host=host,
-        port=port,
-        debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    )
+    app.run(debug=True)
