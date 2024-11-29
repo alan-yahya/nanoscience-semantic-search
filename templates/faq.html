@@ -3,37 +3,68 @@
 {% block title %}FAQ - NanoBERT Search{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1>Frequently Asked Questions</h1>
-    
-    <div class="accordion mt-4" id="faqAccordion">
-        <div class="accordion-item">
-            <h2 class="accordion-header">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
-                    What is this application?
-                </button>
-            </h2>
-            <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
-                <div class="accordion-body">
-                    This web app/API uses custom embeddings from NanoBERT to retrieve relevant Nanoscience papers. It leverages the Hugging Face Inference API and FAISS for a hybrid-vector semantic search.
-                </div>
-            </div>
-        </div>
+<div id="faq-root"></div>
+{% endblock %}
 
-        <div class="accordion-item">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
-                    How does it work?
-                </button>
-            </h2>
-            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                <div class="accordion-body">
-                    The application uses embeddings to convert text into vectors, stores them in a FAISS index, and retrieves relevant information based on similarity search.
-                </div>
-            </div>
-        </div>
+{% block styles %}
+<style>
+    .faq-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1.5rem;
+    }
 
-        <!-- Add more FAQ items as needed -->
-    </div>
-</div>
+    .faq-list {
+        margin-top: 2rem;
+    }
+
+    .faq-item {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .faq-item:last-child {
+        border-bottom: none;
+    }
+
+    .faq-item h2 {
+        color: #2c3e50;
+        font-weight: 600;
+    }
+
+    .faq-item p {
+        font-size: 1.1rem;
+        line-height: 1.6;
+    }
+
+    /* Add responsive padding */
+    @media (max-width: 768px) {
+        .faq-container {
+            padding: 0 1rem;
+            margin: 1rem auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<!-- React Development Scripts -->
+<script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+
+<!-- Load the FAQ Component -->
+<script src="{{ url_for('static', filename='js/FAQPage.jsx') }}" type="text/javascript"></script>
+
+<!-- Initialize the App -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const rootElement = document.getElementById('faq-root');
+        if (rootElement) {
+            ReactDOM.render(React.createElement(FAQPage), rootElement);
+        } else {
+            console.error('FAQ root element not found');
+        }
+    });
+</script>
 {% endblock %} 
