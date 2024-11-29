@@ -3,7 +3,7 @@ import ctypes
 import pickle
 import numpy as np
 import requests
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from dotenv import load_dotenv
 from datasets import load_dataset
 from transformers import AutoTokenizer
@@ -315,6 +315,16 @@ def health_check():
 @app.route('/faq')
 def faq():
     return render_template('faq.html')
+
+@app.route('/debug-static/<path:filename>')
+def debug_static(filename):
+    return send_from_directory(app.static_folder, filename)
+
+@app.after_request
+def add_header(response):
+    if response.headers['Content-Type'] == 'application/javascript':
+        response.headers['Content-Type'] = 'text/babel'
+    return response
 
 # For Coolify deployment
 if __name__ == '__main__':

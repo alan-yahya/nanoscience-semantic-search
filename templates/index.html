@@ -1,75 +1,113 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Database Stats Card -->
-<div class="row">
-    <div class="col">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Database Statistics</h5>
-                <p class="card-text">
-                    Number of FAISS Vectors: {{ faiss_count }}
-                </p>
-                <p class="card-text">
-                    Vector Dimensions: {{ vector_dim }}
-                </p>
-            </div>
+<div class="d-flex flex-column vh-100">
+    <!-- Chat Container -->
+    <div class="flex-grow-1 overflow-auto px-3">
+        <div class="chat-container container-fluid" id="chatContainer">
+            <!-- Messages will be added here -->
         </div>
     </div>
-</div>
-
-<!-- Chat Interface -->
-<div class="row mt-4">
-    <div class="col">
-        <div class="chat-container" id="chatContainer">
-            <!-- Chat messages will be dynamically added here -->
-        </div>
-        
-        <div class="input-group mt-3">
-            <input type="text" id="userInput" class="form-control" placeholder="Type your message...">
-            <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+    
+    <!-- Fixed Input Bar at Bottom -->
+    <div class="fixed-bottom bg-white border-top p-3">
+        <div class="container-fluid">
+            <div class="input-group">
+                <input type="text" id="userInput" class="form-control" placeholder="Type your message...">
+                <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
+{% block styles %}
+<style>
+    .chat-container {
+        min-height: calc(100vh - 120px);
+        height: auto;
+        padding-bottom: 80px;
+        display: flex;
+        flex-direction: column;
+        width: 100% !important;
+    }
+    
+    .user-message {
+        background-color: #e9ecef;
+        border-radius: 15px;
+        padding: 10px;
+        margin: 5px 0;
+        max-width: 80%;
+        margin-left: auto;
+        word-wrap: break-word;
+    }
+    
+    .assistant-message {
+        background-color: #f8f9fa;
+        border-radius: 15px;
+        padding: 10px;
+        margin: 5px 0;
+        max-width: 80%;
+        word-wrap: break-word;
+    }
+</style>
+{% endblock %}
+
 {% block scripts %}
 <script>
+    // Add initial stats message when page loads
+    window.onload = function() {
+        const chatContainer = document.getElementById('chatContainer');
+        const statsDiv = document.createElement('div');
+        statsDiv.className = 'assistant-message';
+        statsDiv.innerHTML = `
+            <strong>Database Statistics</strong><br>
+            Number of FAISS Vectors: {{ faiss_count }}<br>
+            Vector Dimensions: {{ vector_dim }}<br><br>
+            How can I help you search through the nanoscience papers?
+        `;
+        chatContainer.appendChild(statsDiv);
+    };
+
+    function isValidResult(result) {
+        // Check if title exists and is not empty
+        if (!result.title || result.title === '[]' || result.title.length === 0) return false;
+        // Check if DOI exists and is not empty
+        if (!result.doi || result.doi === '[]' || result.doi.length === 0) return false;
+        // Check if title isn't just "Title:" or similar
+        if (result.title.trim().toLowerCase() === 'title:') return false;
+        return true;
+    }
+
     function formatTitle(title) {
-        // Remove square brackets and quotes if present
-        title = title.replace(/[\[\]']/g, '');
+        // Remove square brackets and quotes
+        title = title.replace(/[\[\]'"]/g, '').trim();
+        // Return null if title is invalid
+        if (!title || title.toLowerCase() === 'title:') return null;
         return `<a href="https://www.google.com/search?q=${encodeURIComponent(title)}" target="_blank">${title}</a>`;
     }
 
     function formatDOI(doi) {
-        // Remove square brackets and quotes
-        doi = doi.replace(/[\[\]']/g, '');
+        // Remove square brackets, quotes, and trim
+        doi = doi.replace(/[\[\]'"]/g, '').trim();
         // Remove 'a' prefix and '.html' suffix
         doi = doi.replace(/^a/, '').replace(/\.html$/, '');
         // Replace underscores with forward slashes
-        doi = doi.replace(/_/g, '/');
-        return doi;
+        return doi.replace(/_/g, '/');
     }
 
-    function isValidResult(result) {
-        // Check if title exists and is not empty array
-        if (!result.title || result.title === '[]' || result.title.length === 0) return false;
-        // Check if DOI exists and is not empty
-        if (!result.doi || result.doi === '[]' || result.doi.length === 0) return false;
-        return true;
-    }
+    function formatResult(result) {
+        const title = formatTitle(result.title);
+        if (!title) return null; // Skip if title is invalid
 
-    function removeDuplicates(results) {
-        const seen = new Set();
-        return results.filter(result => {
-            // First check if result is valid
-            if (!isValidResult(result)) return false;
-            
-            const key = `${result.title}-${result.doi}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
+        const doi = formatDOI(result.doi);
+        if (!doi) return null; // Skip if DOI is invalid
+
+        return `
+            Title: ${title}<br>
+            DOI: ${doi}<br>
+            Distance: ${result.distance.toFixed(4)}<br><br>
+        `;
     }
 
     function sendMessage() {
@@ -106,17 +144,18 @@
             if (data.error) {
                 assistantDiv.textContent = `Error: ${data.error}`;
             } else {
-                // Remove duplicates and invalid results before formatting
-                const uniqueResults = removeDuplicates(data.results);
+                // Filter and format results
+                const validResults = data.results
+                    .filter(isValidResult)
+                    .map(formatResult)
+                    .filter(result => result !== null) // Remove any null results
+                    .join('');
                 
-                // Format the results with line breaks and hyperlinks
-                const results = uniqueResults.map(result => {
-                    return `Title: ${formatTitle(result.title)}<br>` +
-                           `DOI: ${formatDOI(result.doi)}<br>` +
-                           `Distance: ${result.distance.toFixed(4)}<br><br>`;
-                }).join('');
-                
-                assistantDiv.innerHTML = results || 'No results found';
+                if (validResults) {
+                    assistantDiv.innerHTML = validResults;
+                } else {
+                    assistantDiv.textContent = 'No valid results found';
+                }
             }
             
             chatContainer.appendChild(assistantDiv);
