@@ -35,14 +35,38 @@
 
 {% block scripts %}
 <script>
+    function formatTitle(title) {
+        // Remove square brackets and quotes if present
+        title = title.replace(/[\[\]']/g, '');
+        return `<a href="https://www.google.com/search?q=${encodeURIComponent(title)}" target="_blank">${title}</a>`;
+    }
+
+    function formatDOI(doi) {
+        // Remove square brackets and quotes
+        doi = doi.replace(/[\[\]']/g, '');
+        // Remove 'a' prefix and '.html' suffix
+        doi = doi.replace(/^a/, '').replace(/\.html$/, '');
+        // Replace underscores with forward slashes
+        doi = doi.replace(/_/g, '/');
+        return doi;
+    }
+
+    function removeDuplicates(results) {
+        const seen = new Set();
+        return results.filter(result => {
+            const key = `${result.title}-${result.doi}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
     function sendMessage() {
         const userInput = document.getElementById('userInput');
         const chatContainer = document.getElementById('chatContainer');
         const query = userInput.value.trim();
         
         if (!query) return;
-
-        console.log('Sending query:', query);  // Debug log
 
         // Add user message to chat
         const userDiv = document.createElement('div');
@@ -53,46 +77,42 @@
         // Clear input
         userInput.value = '';
 
-        const requestData = {
-            query: query,
-            top_k: 5
-        };
-        console.log('Request data:', requestData);  // Debug log
-
-        // Send request to backend
         fetch('/search', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify({
+                query: query,
+                top_k: 5
+            })
         })
-        .then(response => {
-            console.log('Response status:', response.status);  // Debug log
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Response data:', data);  // Debug log
-            // Create response message
             const assistantDiv = document.createElement('div');
             assistantDiv.className = 'assistant-message';
             
             if (data.error) {
                 assistantDiv.textContent = `Error: ${data.error}`;
             } else {
-                // Format the results
-                const results = data.results.map(result => 
-                    `Title: ${result.title}\nDOI: ${result.doi}\nDistance: ${result.distance.toFixed(4)}`
-                ).join('\n\n');
+                // Remove duplicates before formatting
+                const uniqueResults = removeDuplicates(data.results);
                 
-                assistantDiv.textContent = results || 'No results found';
+                // Format the results with line breaks and hyperlinks
+                const results = uniqueResults.map(result => {
+                    return `Title: ${formatTitle(result.title)}<br>` +
+                           `DOI: ${formatDOI(result.doi)}<br>` +
+                           `Distance: ${result.distance.toFixed(4)}<br><br>`;
+                }).join('');
+                
+                assistantDiv.innerHTML = results || 'No results found';
             }
             
             chatContainer.appendChild(assistantDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         })
         .catch(error => {
-            console.error('Fetch error:', error);  // Debug log
+            console.error('Error:', error);
             const errorDiv = document.createElement('div');
             errorDiv.className = 'assistant-message';
             errorDiv.textContent = 'Error: Could not complete the search';

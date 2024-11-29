@@ -8,8 +8,6 @@ from dotenv import load_dotenv
 from datasets import load_dataset
 from transformers import AutoTokenizer
 import faiss
-import threading
-import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -190,14 +188,13 @@ class NanoBERTSearchEngine:
     def search(self, query, top_k=5):
         try:
             query_vector = self.encode_text(query)
-            D, I = self.index.search(query_vector, top_k)
+            D, I = self.index.search(query_vector, top_k * 2)  # Get more results initially
             
+            # Create a set to track unique results
+            seen_results = set()
             results = []
             
-            # Print debug information
-            print(f"Number of metadata entries: {len(self.metadata)}")
-            print(f"Retrieved indices: {I[0]}")
-            
+            # Process results and remove duplicates
             for distance, idx in zip(D[0], I[0]):
                 if idx == -1:  # Skip invalid results
                     continue
@@ -209,16 +206,26 @@ class NanoBERTSearchEngine:
                 if idx not in self.metadata:
                     print(f"Warning: Index {idx} not found in metadata")
                     continue
-                    
+                
                 metadata_entry = self.metadata[idx]
                 
-                results.append({
-                    'distance': float(distance),
-                    'paragraph_id': metadata_entry['paragraph_id'],
-                    'doi': metadata_entry['doi'],
-                    'title': metadata_entry['title'],
-                    'chunk_id': metadata_entry['chunk_id']
-                })
+                # Create a unique key from the title and DOI
+                unique_key = (metadata_entry['title'], metadata_entry['doi'])
+                
+                # Only add if we haven't seen this result before
+                if unique_key not in seen_results:
+                    seen_results.add(unique_key)
+                    results.append({
+                        'distance': float(distance),
+                        'paragraph_id': metadata_entry['paragraph_id'],
+                        'doi': metadata_entry['doi'],
+                        'title': metadata_entry['title'],
+                        'chunk_id': metadata_entry['chunk_id']
+                    })
+                    
+                    # Break if we have enough unique results
+                    if len(results) >= top_k:
+                        break
             
             return results
             
@@ -305,33 +312,14 @@ def search_documents():
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
-@app.route('/ping', methods=['GET'])
-def ping():
-    return jsonify({"status": "alive"}), 200
-
-def periodic_ping():
-    while True:
-        try:
-            # Get the server's URL from environment variable or use default
-            server_url = os.getenv('SERVER_URL', 'http://localhost:5000')
-            requests.get(f"{server_url}/ping")
-            print("Ping successful")
-        except Exception as e:
-            print(f"Ping failed: {str(e)}")
-        time.sleep(30)  # Wait 30 seconds before next ping
-
 @app.route('/faq')
 def faq():
     return render_template('faq.html')
 
 # For Coolify deployment
 if __name__ == '__main__':
-    # Start the periodic ping in a background thread
-    ping_thread = threading.Thread(target=periodic_ping, daemon=True)
-    ping_thread.start()
-    
-    # Run the Flask app with Coolify environment variables
-    port = int(os.environ.get('PORT', 3000))  # Coolify commonly uses port 3000
+    # Run the Flask app
+    port = int(os.environ.get('PORT', 3000))
     host = os.environ.get('HOST', '0.0.0.0')
     
     app.run(

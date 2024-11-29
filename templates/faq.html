@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}FAQ - RAG Chat Assistant{% endblock %}
+{% block title %}FAQ - NanoBERT Search{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -15,7 +15,7 @@
             </h2>
             <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
                 <div class="accordion-body">
-                    This is a RAG-powered chat application that uses FAISS for efficient vector similarity search.
+                    This web app/API uses custom embeddings from NanoBERT to retrieve relevant Nanoscience papers. It leverages the Hugging Face Inference API and FAISS for a hybrid-vector semantic search.
                 </div>
             </div>
         </div>
