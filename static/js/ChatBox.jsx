@@ -27,6 +27,13 @@ const ChatBox = ({ faissCount, vectorDim }) => {
         ]);
     }, [faissCount, vectorDim]);
 
+    // Remove initial message after the next message
+    React.useEffect(() => {
+        if (messages.length > 1) {
+            setMessages(prevMessages => prevMessages.filter((_, index) => index !== 0));
+        }
+    }, [messages]);
+
     React.useEffect(() => {
         // Scroll to bottom when messages change
         if (chatContainerRef.current) {
