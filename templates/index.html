@@ -166,21 +166,68 @@
 
 {% block scripts %}
 <script>
-    // Add initial stats message when page loads
-    window.onload = function() {
-        const chatContainer = document.getElementById('chatContainer');
-        const statsDiv = document.createElement('div');
-        statsDiv.className = 'assistant-message';
-        statsDiv.innerHTML = `
-            <strong>Database Statistics</strong><br>
-            <strong>FAISS Index:</strong> {{ 'recursive_paragraph_embeddings' if using_recursive else 'paragraph_embeddings' }}<br>
-            Number of FAISS Vectors: {{ faiss_count }}<br>
-            Number of Unique DOIs: {{ unique_dois }}<br>
-            Vector Dimensions: {{ vector_dim }}<br><br>
-            Please describe the topics or content of the nanoscience papers you want to search for.
-        `;
-        chatContainer.appendChild(statsDiv);
-    };
+    // Add event listener for vector representation changes
+    document.getElementById('vectorRepresentation').addEventListener('change', function() {
+        this.disabled = true;
+        
+        fetch('/toggle_embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                toggle_type: 'vector_representation'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update stats message
+                const chatContainer = document.getElementById('chatContainer');
+                const firstMessage = chatContainer.firstChild;
+                
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    <strong>FAISS DB:</strong> ${data.embedding_type === 'openai' ? 'openai-embeddings' : 
+                        (data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
+                    Number of FAISS vectors: ${data.vector_count}<br>
+                    Number of unique papers: ${data.unique_dois}<br>
+                    Vector Dimensions: ${data.vector_dim}<br><br>
+                    Please describe the topics or content of the nanoscience papers you want to search for.
+                `;
+                
+                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                    chatContainer.replaceChild(statsDiv, firstMessage);
+                } else {
+                    chatContainer.insertBefore(statsDiv, firstMessage);
+                }
+
+                // Update segmentation strategy options
+                const segStrategy = document.getElementById('segmentationStrategy');
+                if (data.embedding_type === 'openai') {
+                    segStrategy.innerHTML = '<option value="standard" selected>Standard</option>';
+                } else {
+                    segStrategy.innerHTML = `
+                        <option value="recursive" ${data.using_recursive ? 'selected' : ''}>Recursive</option>
+                        <option value="standard" ${!data.using_recursive ? 'selected' : ''}>Standard</option>
+                    `;
+                }
+            } else {
+                alert(data.error || 'Failed to toggle vector representation');
+                this.value = data.embedding_type === 'openai' ? 'nanobert' : 'openai';  // Reset to previous value
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error toggling vector representation');
+            this.value = 'nanobert';  // Reset to NanoBERT on error
+        })
+        .finally(() => {
+            this.disabled = false;
+        });
+    });
 
     function isValidResult(result) {
         // Check if title exists and is not empty
@@ -327,69 +374,6 @@
         if (e.key === 'Enter') {
             sendMessage();
         }
-    });
-
-    // Add event listener for vector representation changes
-    document.getElementById('vectorRepresentation').addEventListener('change', function() {
-        this.disabled = true;
-        
-        fetch('/toggle_embeddings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                toggle_type: 'vector_representation'
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Update stats message
-                const chatContainer = document.getElementById('chatContainer');
-                const firstMessage = chatContainer.firstChild;
-                
-                const statsDiv = document.createElement('div');
-                statsDiv.className = 'assistant-message';
-                statsDiv.innerHTML = `
-                    <strong>Database Statistics</strong><br>
-                    <strong>FAISS DB:</strong> ${data.embedding_type === 'openai' ? 'openai-embeddings' : 
-                        (data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
-                    Number of FAISS vectors: ${data.vector_count}<br>
-                    Number of unique papers: ${data.unique_dois}<br>
-                    Vector Dimensions: ${data.vector_dim}<br><br>
-                    Please describe the topics or content of the nanoscience papers you want to search for.
-                `;
-                
-                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
-                    chatContainer.replaceChild(statsDiv, firstMessage);
-                } else {
-                    chatContainer.insertBefore(statsDiv, firstMessage);
-                }
-
-                // Update segmentation strategy options
-                const segStrategy = document.getElementById('segmentationStrategy');
-                if (data.embedding_type === 'openai') {
-                    segStrategy.innerHTML = '<option value="standard" selected>Standard</option>';
-                } else {
-                    segStrategy.innerHTML = `
-                        <option value="recursive" ${data.using_recursive ? 'selected' : ''}>Recursive</option>
-                        <option value="standard" ${!data.using_recursive ? 'selected' : ''}>Standard</option>
-                    `;
-                }
-            } else {
-                alert(data.error || 'Failed to toggle vector representation');
-                this.value = data.embedding_type === 'openai' ? 'nanobert' : 'openai';  // Reset to previous value
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error toggling vector representation');
-            this.value = 'nanobert';  // Reset to NanoBERT on error
-        })
-        .finally(() => {
-            this.disabled = false;
-        });
     });
 
     document.getElementById('segmentationStrategy').addEventListener('change', function() {
