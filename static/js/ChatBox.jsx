@@ -6,20 +6,21 @@ const ChatBox = ({ faissCount, vectorDim }) => {
 
     React.useEffect(() => {
         // Add initial stats message and a welcome message
-        setMessages([{
-            type: 'assistant',
-            content: `
-                <strong>Database Statistics</strong><br>
-                Number of FAISS Vectors: ${faissCount}<br>
-                Vector Dimensions: ${vectorDim}<br><br>
-                How can I help you search through the nanoscience papers?
-            `
-        }]);
-        // Add welcome message
-        setMessages(prev => [...prev, {
-            type: 'assistant',
-            content: 'Welcome back! How can I assist you with your nanoscience paper search today?'
-        }]);
+        setMessages([
+            {
+                type: 'assistant',
+                content: `
+                    <strong>Database Statistics</strong><br>
+                    Number of FAISS Vectors: ${faissCount}<br>
+                    Vector Dimensions: ${vectorDim}<br><br>
+                    How can I help you search through the nanoscience papers?
+                `
+            },
+            {
+                type: 'assistant',
+                content: 'Welcome back! How can I assist you with your nanoscience paper search today?'
+            }
+        ]);
     }, [faissCount, vectorDim]);
 
     React.useEffect(() => {
