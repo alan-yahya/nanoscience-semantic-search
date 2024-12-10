@@ -19,6 +19,17 @@ const ChatContainer = ({ isRecursive, faissCount, vectorDim }) => {
                 `
             }
         ]);
+        
+        // Add message for changing to NanoBERT with standard segmentation strategy after 1 second
+        setTimeout(() => {
+            setMessages(prevMessages => [
+                ...prevMessages,
+                {
+                    type: 'assistant',
+                    content: 'Switched to NanoBERT with standard segmentation strategy.'
+                }
+            ]);
+        }, 1000);
     }, [faissCount, vectorDim]);
 
     // Remove initial message after the next message
