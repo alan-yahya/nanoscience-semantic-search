@@ -280,16 +280,20 @@ def index():
         faiss_count = search_engine.index.ntotal
         vector_dim = search_engine.index.d
         using_recursive = session.get('use_recursive', True)
+        # Get unique DOIs count
+        unique_dois = len(set(doi for metadata in search_engine.metadata.values() for doi in [metadata['doi']]))
     except Exception as e:
         print(f"Error getting FAISS stats: {e}")
         faiss_count = 0
         vector_dim = 0
         using_recursive = True
+        unique_dois = 0
     
     return render_template('index.html', 
                          faiss_count=faiss_count,
                          vector_dim=vector_dim,
-                         using_recursive=using_recursive)
+                         using_recursive=using_recursive,
+                         unique_dois=unique_dois)
 
 @app.route('/search', methods=['POST'])
 def search_documents():
@@ -396,11 +400,15 @@ def toggle_embeddings():
                 metadata_file="paragraph_metadata.pkl"
             )
         
+        # Get unique DOIs count for new engine
+        unique_dois = len(set(doi for metadata in search_engine.metadata.values() for doi in [metadata['doi']]))
+        
         response_data = {
             "success": True,
             "using_recursive": session['use_recursive'],
             "vector_count": search_engine.index.ntotal,
-            "vector_dim": search_engine.index.d
+            "vector_dim": search_engine.index.d,
+            "unique_dois": unique_dois
         }
         print(f"Response data: {response_data}")
         return jsonify(response_data)
@@ -423,5 +431,5 @@ if __name__ == '__main__':
     app.run(
         host=host,
         port=port,
-        debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+        debug='true'
     )

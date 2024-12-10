@@ -3,10 +3,14 @@
 {% block content %}
 <div class="chat-wrapper">
     <!-- Add Toggle Button -->
-    <div class="toggle-container">
-        <button id="toggleEmbeddings" class="btn btn-outline-secondary btn-sm">
-            Using: <span id="embeddingType">{{ 'Recursive' if using_recursive else 'Standard' }}</span> Embeddings
-        </button>
+    <div class="search-settings">
+        <div class="settings-group">
+            <label for="segmentationStrategy">Segmentation Strategy:</label>
+            <select id="segmentationStrategy" class="form-select form-select-sm">
+                <option value="recursive" {{ 'selected' if using_recursive else '' }}>Recursive</option>
+                <option value="standard" {{ 'selected' if not using_recursive else '' }}>Standard</option>
+            </select>
+        </div>
     </div>
     
     <!-- Chat Container -->
@@ -114,23 +118,36 @@
     }
 
     /* Add these styles */
-    .toggle-container {
+    .search-settings {
         position: fixed;
         top: 70px;  /* Below navbar */
         right: 20px;
         z-index: 1000;
         padding: 10px;
-    }
-    
-    #toggleEmbeddings {
-        font-size: 0.85rem;
-        padding: 0.25rem 0.5rem;
-        background-color: white;
-        border-color: #ccc;
-    }
-    
-    #toggleEmbeddings:hover {
         background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .settings-group {
+        margin-bottom: 0.5rem;
+    }
+    
+    .settings-group:last-child {
+        margin-bottom: 0;
+    }
+    
+    .settings-group label {
+        display: block;
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+        color: #6c757d;
+    }
+    
+    .settings-group select {
+        width: 200px;
+        font-size: 0.9rem;
+        border-color: #dee2e6;
     }
 </style>
 {% endblock %}
@@ -144,7 +161,9 @@
         statsDiv.className = 'assistant-message';
         statsDiv.innerHTML = `
             <strong>Database Statistics</strong><br>
+            <strong>FAISS Index:</strong> {{ 'recursive_paragraph_embeddings' if using_recursive else 'paragraph_embeddings' }}<br>
             Number of FAISS Vectors: {{ faiss_count }}<br>
+            Number of Unique DOIs: {{ unique_dois }}<br>
             Vector Dimensions: {{ vector_dim }}<br><br>
             Please describe the topics or content of the nanoscience papers you want to search for.
         `;
@@ -258,7 +277,13 @@
                     .join('');
                 
                 if (validResults) {
-                    assistantDiv.innerHTML = validResults;
+                    // Get current segmentation strategy
+                    const segStrategy = document.getElementById('segmentationStrategy');
+                    const strategyText = segStrategy ? segStrategy.options[segStrategy.selectedIndex].text : 'Unknown';
+                    
+                    assistantDiv.innerHTML = `
+                        <strong>Top Responses (${strategyText} Segmentation):</strong><br><br>
+                        ${validResults}`;
                 } else {
                     assistantDiv.textContent = 'No valid results found';
                 }
@@ -286,12 +311,15 @@
         }
     });
 
-    document.getElementById('toggleEmbeddings').addEventListener('click', function() {
+    document.getElementById('segmentationStrategy').addEventListener('change', function() {
         console.log('Toggle button clicked');
         
         // Disable button during request
         this.disabled = true;
         console.log('Button disabled');
+        
+        // Store original value to restore if operation fails
+        const originalValue = this.value;
         
         fetch('/toggle_embeddings', {
             method: 'POST',
@@ -301,38 +329,60 @@
         })
         .then(response => {
             console.log('Response received:', response);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
             console.log('Data received:', data);
             if (data.success) {
                 console.log('Toggle successful');
-                // Update button text
-                document.getElementById('embeddingType').textContent = 
-                    data.using_recursive ? 'Recursive' : 'Standard';
                 
-                // Clear chat history
-                const chatContainer = document.getElementById('chatContainer');
-                chatContainer.innerHTML = '';
-                
-                // Add new stats message
-                const statsDiv = document.createElement('div');
-                statsDiv.className = 'assistant-message';
-                statsDiv.innerHTML = `
-                    <strong>Database Statistics</strong><br>
-                    Number of FAISS Vectors: ${data.vector_count}<br>
-                    Vector Dimensions: ${data.vector_dim}<br><br>
-                    Please describe the topics or content of the nanoscience papers you want to search for.
-                `;
-                chatContainer.appendChild(statsDiv);
+                try {
+                    // Update dropdown value
+                    this.value = data.using_recursive ? 'recursive' : 'standard';
+                    
+                    // Get chat container
+                    const chatContainer = document.getElementById('chatContainer');
+                    if (!chatContainer) {
+                        throw new Error('Chat container not found');
+                    }
+                    
+                    // Create new stats message
+                    const statsDiv = document.createElement('div');
+                    statsDiv.className = 'assistant-message';
+                    statsDiv.innerHTML = `
+                        <strong>Database Statistics</strong><br>
+                        <strong>FAISS Index:</strong> ${data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings'}<br>
+                        Number of FAISS Vectors: ${data.vector_count}<br>
+                        Number of Unique DOIs: ${data.unique_dois}<br>
+                        Vector Dimensions: ${data.vector_dim}<br><br>
+                        Please describe the topics or content of the nanoscience papers you want to search for.
+                    `;
+                    
+                    // Find and update first message
+                    const firstMessage = chatContainer.firstChild;
+                    if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                        chatContainer.replaceChild(statsDiv, firstMessage);
+                    } else {
+                        chatContainer.insertBefore(statsDiv, firstMessage);
+                    }
+                } catch (error) {
+                    console.error('Error updating UI:', error);
+                    this.value = originalValue;  // Restore original value
+                    throw error;  // Re-throw to be caught by outer catch
+                }
             } else {
                 console.error('Toggle failed:', data.error);
-                alert('Failed to toggle embeddings. Please try again.');
+                this.value = originalValue;  // Restore original value
+                throw new Error(data.error || 'Toggle failed');
             }
         })
         .catch(error => {
             console.error('Fetch error:', error);
-            alert('Error toggling embeddings. Please try again.');
+            this.value = originalValue;  // Restore original value
+            alert(`Error toggling embeddings: ${error.message}`);
         })
         .finally(() => {
             // Re-enable button
