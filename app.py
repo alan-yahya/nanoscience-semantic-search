@@ -239,6 +239,15 @@ class NanoBERTSearchEngine:
             # Create a dictionary to track unique results by DOI and paragraph
             unique_results = {}
             
+            # Adjust distance calculation based on embedding type
+            def calculate_similarity(distance):
+                if self.embedding_type == "openai":
+                    # For OpenAI embeddings, use cosine similarity
+                    return 1 - (distance / 2)  # Convert L2 distance to cosine similarity
+                else:
+                    # For NanoBERT, keep existing distance calculation
+                    return float(distance)
+            
             # Process results and remove duplicates
             for distance, idx in zip(D[0], I[0]):
                 if idx == -1:
@@ -258,10 +267,14 @@ class NanoBERTSearchEngine:
                 # Create a unique key combining DOI and paragraph_id
                 unique_key = f"{doi}_{paragraph_id}"
                 
+                # Calculate adjusted similarity score
+                similarity_score = calculate_similarity(distance)
+                
                 # Only keep if it's a new DOI or a better match for this paragraph
-                if unique_key not in unique_results or distance < unique_results[unique_key]['distance']:
+                if unique_key not in unique_results or similarity_score > unique_results[unique_key]['similarity_score']:
                     unique_results[unique_key] = {
                         'distance': float(distance),
+                        'similarity_score': similarity_score,
                         'title': metadata_entry['title'],
                         'doi': doi,
                         'paragraph_id': paragraph_id,
@@ -275,9 +288,12 @@ class NanoBERTSearchEngine:
                     if unique_dois >= top_k:
                         break
             
-            # Convert dictionary to list and sort by distance
-            results = list(unique_results.values())
-            results.sort(key=lambda x: x['distance'])
+            # Convert dictionary to list and sort by similarity score
+            results = sorted(
+                unique_results.values(),
+                key=lambda x: x['similarity_score'],
+                reverse=True  # Higher similarity scores are better
+            )
             
             # Take only top_k results
             return results[:top_k]
@@ -410,7 +426,7 @@ def toggle_embeddings():
         
         else:  # toggle_type == 'segmentation_strategy'
             # Toggle between recursive and standard (only for NanoBERT)
-            if session.get('embedding_type', 'nanobert') == 'openai':
+            if session.get('embedding_type', 'openai') == 'openai':
                 return jsonify({
                     "success": False,
                     "error": "Cannot change segmentation strategy while using OpenAI embeddings"
@@ -452,7 +468,14 @@ def toggle_embeddings():
             "error": str(e)
         }), 500
 
+#For local testing
+if __name__ == '__main__':
+    app.run(
+        debug='true'
+    )
+
 # For Coolify deployment
+'''
 if __name__ == '__main__':
     # Run the Flask app
     port = int(os.environ.get('PORT', 3000))
@@ -463,3 +486,4 @@ if __name__ == '__main__':
         port=port,
         debug='true'
     )
+'''

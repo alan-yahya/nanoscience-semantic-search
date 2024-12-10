@@ -23,11 +23,11 @@
     <!-- Chat Container -->
     <div class="chat-scroll-area">
         <div class="chat-container container-fluid" id="chatContainer">
-            <!-- Messages will be added here -->
+            <!-- Only one initial message will be added here via JavaScript -->
         </div>
     </div>
     
-    <!-- Fixed Input Bar at Bottom -->
+    <!-- Input Bar -->
     <div class="input-bar">
         <div class="container-fluid">
             <div class="input-group">
@@ -293,8 +293,14 @@
                     const segStrategy = document.getElementById('segmentationStrategy');
                     const strategyText = segStrategy ? segStrategy.options[segStrategy.selectedIndex].text : 'Unknown';
                     
+                    // Get current vector representation
+                    const vectorRep = document.getElementById('vectorRepresentation');
+                    const vectorText = vectorRep ? vectorRep.options[vectorRep.selectedIndex].text : 'Unknown';
+                    
                     assistantDiv.innerHTML = `
-                        <strong>Top Responses (${strategyText} Segmentation):</strong><br><br>
+                        <strong>Top Responses</strong><br>
+                        <em>Vector Representation: ${vectorText}</em><br>
+                        <em>Segmentation Strategy: ${strategyText}</em><br><br>
                         ${validResults}`;
                 } else {
                     assistantDiv.textContent = 'No valid results found';
@@ -347,10 +353,10 @@
                 statsDiv.className = 'assistant-message';
                 statsDiv.innerHTML = `
                     <strong>Database Statistics</strong><br>
-                    <strong>FAISS Index:</strong> ${data.embedding_type === 'openai' ? 'openai-embeddings' : 
+                    <strong>FAISS DB:</strong> ${data.embedding_type === 'openai' ? 'openai-embeddings' : 
                         (data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
-                    Number of FAISS Vectors: ${data.vector_count}<br>
-                    Number of Unique DOIs: ${data.unique_dois}<br>
+                    Number of FAISS vectors: ${data.vector_count}<br>
+                    Number of unique papers: ${data.unique_dois}<br>
                     Vector Dimensions: ${data.vector_dim}<br><br>
                     Please describe the topics or content of the nanoscience papers you want to search for.
                 `;
@@ -359,6 +365,17 @@
                     chatContainer.replaceChild(statsDiv, firstMessage);
                 } else {
                     chatContainer.insertBefore(statsDiv, firstMessage);
+                }
+
+                // Update segmentation strategy options
+                const segStrategy = document.getElementById('segmentationStrategy');
+                if (data.embedding_type === 'openai') {
+                    segStrategy.innerHTML = '<option value="standard" selected>Standard</option>';
+                } else {
+                    segStrategy.innerHTML = `
+                        <option value="recursive" ${data.using_recursive ? 'selected' : ''}>Recursive</option>
+                        <option value="standard" ${!data.using_recursive ? 'selected' : ''}>Standard</option>
+                    `;
                 }
             } else {
                 alert(data.error || 'Failed to toggle vector representation');
@@ -421,7 +438,7 @@
                     statsDiv.className = 'assistant-message';
                     statsDiv.innerHTML = `
                         <strong>Database Statistics</strong><br>
-                        <strong>FAISS Index:</strong> ${data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings'}<br>
+                        <strong>FAISS DB:</strong> ${data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings'}<br>
                         Number of FAISS Vectors: ${data.vector_count}<br>
                         Number of Unique DOIs: ${data.unique_dois}<br>
                         Vector Dimensions: ${data.vector_dim}<br><br>
