@@ -24,8 +24,7 @@ const ChatContainer = ({ isRecursive, faissCount, vectorDim }) => {
                 content: `
                     <strong>Database Statistics</strong><br><br>
                     Number of FAISS Vectors: ${faissCount}<br>
-                    Vector Dimensions: ${vectorDim}<br><br>
-                    Please describe the topics or content of the nanoscience papers you want to search for.
+                    Vector Dimensions: ${vectorDim}<br>
                 `
             }
         ];

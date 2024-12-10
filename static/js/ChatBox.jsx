@@ -9,15 +9,17 @@ const ChatBox = ({ faissCount, vectorDim }) => {
         setMessages([
             {
                 type: 'assistant',
-                content: 'Please select a vector representation and segmentation strategy.'
+                content: `
+                    Please describe the topics or content of the nanoscience papers you want to search for. Provide as much detail as possible to improve the quality of the search. Ie. rather than "gold nanoparticles", search for: "gold nanoparticles for plasmonic sensing".
+                    The vector representation and knowledge segmentation strategy can be adjusted in the top right settings.
+                `
             },
             {
                 type: 'assistant',
                 content: `
                     <strong>Database Statistics</strong><br>
                     Number of FAISS Vectors: ${faissCount}<br>
-                    Vector Dimensions: ${vectorDim}<br><br>
-                    How can I help you search through the nanoscience papers?
+                    Vector Dimensions: ${vectorDim}<br>
                 `
             },
             {

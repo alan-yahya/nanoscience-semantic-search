@@ -24,7 +24,8 @@
     <div class="chat-scroll-area">
         <div class="chat-container container-fluid" id="chatContainer">
             <div class="assistant-message">
-                Please select a vector representation and segmentation strategy.
+                Please describe the topics or content of the nanoscience papers you want to search for. Provide as much detail as possible to improve the quality of the search. Ie. rather than "gold nanoparticles", search for: "gold nanoparticles for plasmonic sensing".
+                The vector representation and knowledge segmentation strategy can be adjusted in the top right settings.
             </div>
         </div>
     </div>
@@ -216,8 +217,7 @@
                         (data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
                     Number of FAISS vectors: ${data.vector_count}<br>
                     Number of unique papers: ${data.unique_dois}<br>
-                    Vector Dimensions: ${data.vector_dim}<br><br>
-                    Please describe the topics or content of the nanoscience papers you want to search for.
+                    Vector Dimensions: ${data.vector_dim}<br>
                 `;
                 
                 if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
