@@ -24,7 +24,7 @@ const ChatContainer = ({ isRecursive, faissCount, vectorDim }) => {
                 content: `
                     <strong>Database Statistics</strong><br><br>
                     Number of FAISS Vectors: ${faissCount}<br>
-                    Vector Dimensions: ${vectorDim}<br>
+                    Vector Dimensions: ${vectorDim}
                 `
             }
         ];

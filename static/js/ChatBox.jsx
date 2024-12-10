@@ -19,7 +19,7 @@ const ChatBox = ({ faissCount, vectorDim }) => {
                 content: `
                     <strong>Database Statistics</strong><br>
                     Number of FAISS Vectors: ${faissCount}<br>
-                    Vector Dimensions: ${vectorDim}<br>
+                    Vector Dimensions: ${vectorDim}
                 `
             },
             {
