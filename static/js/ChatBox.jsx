@@ -6,11 +6,15 @@ const ChatBox = ({ faissCount, vectorDim }) => {
 
     React.useEffect(() => {
         // Add initial stats message and a welcome message
+
+        // ie. Provide as much detail as possible to improve the quality of the search. Ie. rather than "gold nanoparticles", search for: "gold nanoparticles for plasmonic sensing".
+        
         setMessages([
             {
                 type: 'assistant',
                 content: `
-                    Please describe the topics or content of the nanoscience papers you want to search for. Provide as much detail as possible to improve the quality of the search. Ie. rather than "gold nanoparticles", search for: "gold nanoparticles for plasmonic sensing".
+                    Please describe the topics or content of the nanoscience papers you want to search for. 
+                    
                     The vector representation and knowledge segmentation strategy can be adjusted in the top right settings.
                 `
             },
