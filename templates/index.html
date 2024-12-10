@@ -466,16 +466,15 @@
             return;
         }
 
-        // Create new stats message
+        // Create new stats message with default values
         const statsDiv = document.createElement('div');
         statsDiv.className = 'assistant-message';
         statsDiv.innerHTML = `
             <strong>Database Statistics</strong><br>
-            <strong>FAISS DB:</strong> ${sessionStorage.getItem('embedding_type') === 'openai' ? 'openai-embeddings' : 
-                (sessionStorage.getItem('use_recursive') === 'true' ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
-            Number of FAISS Vectors: ${sessionStorage.getItem('vector_count')}<br>
-            Number of Unique DOIs: ${sessionStorage.getItem('unique_dois')}<br>
-            Vector Dimensions: ${sessionStorage.getItem('vector_dim')}<br><br>
+            <strong>FAISS DB:</strong> ${'nanobert' === 'openai' ? 'openai-embeddings' : 
+                (false ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
+            Number of FAISS Vectors: ${faissCount}<br>
+            Vector Dimensions: ${vectorDim}<br><br>
             Please describe the topics or content of the nanoscience papers you want to search for.
         `;
 
