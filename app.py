@@ -377,6 +377,7 @@ def get_current_settings():
         return jsonify({
             "error": str(e)
         }), 500
+@app.route('/toggle_embeddings', methods=['POST'])
 def toggle_embeddings():
     """Toggle between different embedding types and strategies"""
     try:
