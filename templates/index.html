@@ -218,13 +218,11 @@
                 }
             } else {
                 alert(data.error || 'Failed to toggle vector representation');
-                this.value = data.embedding_type === 'openai' ? 'nanobert' : 'openai';  // Reset to previous value
             }
         })
         .catch(error => {
             console.error('Error:', error);
             alert('Error toggling vector representation');
-            this.value = 'nanobert';  // Reset to NanoBERT on error
         })
         .finally(() => {
             this.disabled = false;
@@ -385,9 +383,6 @@
         this.disabled = true;
         console.log('Button disabled');
         
-        // Store original value to restore if operation fails
-        const originalValue = this.value;
-        
         fetch('/toggle_embeddings', {
             method: 'POST',
             headers: {
@@ -409,49 +404,38 @@
             if (data.success) {
                 console.log('Toggle successful');
                 
-                try {
-                    // Update dropdown value
-                    this.value = data.using_recursive ? 'recursive' : 'standard';
-                    
-                    // Get chat container
-                    const chatContainer = document.getElementById('chatContainer');
-                    if (!chatContainer) {
-                        throw new Error('Chat container not found');
-                    }
-                    
-                    // Create new stats message
-                    const statsDiv = document.createElement('div');
-                    statsDiv.className = 'assistant-message';
-                    statsDiv.innerHTML = `
-                        <strong>Database Statistics</strong><br>
-                        <strong>FAISS DB:</strong> ${data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings'}<br>
-                        Number of FAISS Vectors: ${data.vector_count}<br>
-                        Number of Unique DOIs: ${data.unique_dois}<br>
-                        Vector Dimensions: ${data.vector_dim}<br><br>
-                        Please describe the topics or content of the nanoscience papers you want to search for.
-                    `;
-                    
-                    // Find and update first message
-                    const firstMessage = chatContainer.firstChild;
-                    if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
-                        chatContainer.replaceChild(statsDiv, firstMessage);
-                    } else {
-                        chatContainer.insertBefore(statsDiv, firstMessage);
-                    }
-                } catch (error) {
-                    console.error('Error updating UI:', error);
-                    this.value = originalValue;  // Restore original value
-                    throw error;  // Re-throw to be caught by outer catch
+                // Get chat container
+                const chatContainer = document.getElementById('chatContainer');
+                if (!chatContainer) {
+                    throw new Error('Chat container not found');
+                }
+                
+                // Create new stats message
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    <strong>FAISS DB:</strong> ${data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings'}<br>
+                    Number of FAISS Vectors: ${data.vector_count}<br>
+                    Number of Unique DOIs: ${data.unique_dois}<br>
+                    Vector Dimensions: ${data.vector_dim}<br><br>
+                    Please describe the topics or content of the nanoscience papers you want to search for.
+                `;
+                
+                // Find and update first message
+                const firstMessage = chatContainer.firstChild;
+                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                    chatContainer.replaceChild(statsDiv, firstMessage);
+                } else {
+                    chatContainer.insertBefore(statsDiv, firstMessage);
                 }
             } else {
                 console.error('Toggle failed:', data.error);
-                this.value = originalValue;  // Restore original value
                 throw new Error(data.error || 'Toggle failed');
             }
         })
         .catch(error => {
             console.error('Fetch error:', error);
-            this.value = originalValue;  // Restore original value
             alert(`Error toggling embeddings: ${error.message}`);
         })
         .finally(() => {
