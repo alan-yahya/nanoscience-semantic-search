@@ -7,7 +7,7 @@
         <div class="settings-group">
             <label for="vectorRepresentation">Vector Representation:</label>
             <select id="vectorRepresentation" class="form-select form-select-sm">
-                <option value="nanobert" selected>NanoBERT</option>
+                <option value="nanobert">NanoBERT</option>
                 <option value="openai">OpenAI</option>
             </select>
         </div>
@@ -15,7 +15,7 @@
             <label for="segmentationStrategy">Segmentation Strategy:</label>
             <select id="segmentationStrategy" class="form-select form-select-sm">
                 <option value="recursive">Recursive</option>
-                <option value="standard" selected>Standard</option>
+                <option value="standard">Standard</option>
             </select>
         </div>
     </div>
@@ -168,7 +168,19 @@
 
 {% block scripts %}
 <script>
-    // Add event listener for vector representation changes
+    // Set initial dropdown selections based on session data
+    document.addEventListener('DOMContentLoaded', function() {
+        const vectorRep = document.getElementById('vectorRepresentation');
+        const segStrategy = document.getElementById('segmentationStrategy');
+
+        fetch('/get_current_settings')
+            .then(response => response.json())
+            .then(data => {
+                vectorRep.value = data.embedding_type;
+                segStrategy.value = data.using_recursive ? 'recursive' : 'standard';
+            })
+            .catch(error => console.error('Error fetching current settings:', error));
+    });
     document.getElementById('vectorRepresentation').addEventListener('change', function() {
         this.disabled = true;
         

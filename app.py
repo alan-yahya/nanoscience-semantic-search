@@ -362,7 +362,21 @@ def add_header(response):
         response.headers['Content-Type'] = 'text/babel'
     return response
 
-@app.route('/toggle_embeddings', methods=['POST'])
+@app.route('/get_current_settings', methods=['GET'])
+def get_current_settings():
+    """Provide current embedding type and segmentation strategy to the frontend"""
+    try:
+        embedding_type = session.get('embedding_type', 'nanobert')
+        using_recursive = session.get('use_recursive', False)
+        return jsonify({
+            "embedding_type": embedding_type,
+            "using_recursive": using_recursive
+        })
+    except Exception as e:
+        print(f"Error fetching current settings: {str(e)}")
+        return jsonify({
+            "error": str(e)
+        }), 500
 def toggle_embeddings():
     """Toggle between different embedding types and strategies"""
     try:
