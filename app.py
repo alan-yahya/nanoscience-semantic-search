@@ -270,8 +270,10 @@ def index():
         # Get FAISS index stats from the search_engine instance
         faiss_count = search_engine.index.ntotal
         vector_dim = search_engine.index.d
-        using_recursive = session.get('use_recursive', True)
-        # Get unique DOIs count
+        # Default to standard segmentation strategy
+        using_recursive = session.get('use_recursive', False)
+        # Default to NanoBERT vector representation
+        session['embedding_type'] = session.get('embedding_type', 'nanobert')
         unique_dois = len(set(doi for metadata in search_engine.metadata.values() for doi in [metadata['doi']]))
     except Exception as e:
         print(f"Error getting FAISS stats: {e}")
