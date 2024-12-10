@@ -184,6 +184,11 @@
     document.getElementById('vectorRepresentation').addEventListener('change', function() {
         this.disabled = true;
         
+        // Add loading message
+        const loadingDiv = createLoadingMessage();
+        chatContainer.appendChild(loadingDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
         fetch('/toggle_embeddings', {
             method: 'POST',
             headers: {
@@ -195,6 +200,9 @@
         })
         .then(response => response.json())
         .then(data => {
+            // Remove loading message
+            loadingDiv.remove();
+
             if (data.success) {
                 // Update stats message
                 const chatContainer = document.getElementById('chatContainer');
