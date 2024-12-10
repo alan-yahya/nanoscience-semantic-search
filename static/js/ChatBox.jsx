@@ -5,7 +5,7 @@ const ChatBox = ({ faissCount, vectorDim }) => {
     const chatContainerRef = React.useRef(null);
 
     React.useEffect(() => {
-        // Add initial stats message
+        // Add initial stats message and a welcome message
         setMessages([{
             type: 'assistant',
             content: `
@@ -14,6 +14,11 @@ const ChatBox = ({ faissCount, vectorDim }) => {
                 Vector Dimensions: ${vectorDim}<br><br>
                 How can I help you search through the nanoscience papers?
             `
+        }]);
+        // Add welcome message
+        setMessages(prev => [...prev, {
+            type: 'assistant',
+            content: 'Welcome back! How can I assist you with your nanoscience paper search today?'
         }]);
     }, [faissCount, vectorDim]);
 
