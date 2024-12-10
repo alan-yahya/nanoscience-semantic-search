@@ -228,73 +228,33 @@ class NanoBERTSearchEngine:
         try:
             query_vector = self.encode_text(query)
             
-            # Get more results initially
-            D, I = self.index.search(query_vector, top_k * 5)  # Increased multiplier
+            # Perform search on the FAISS index
+            D, I = self.index.search(query_vector, top_k)
             
             print("\nRaw search results:")
             for d, i in zip(D[0], I[0]):
                 print(f"Distance: {d}, Index: {i}")
             
-            # Create a dictionary to track unique results by DOI and paragraph
-            unique_results = {}
-            
-            # Adjust distance calculation based on embedding type
-            def calculate_similarity(distance):
-                if self.embedding_type == "openai":
-                    # For OpenAI embeddings, use cosine similarity
-                    return 1 - (distance / 2)  # Convert L2 distance to cosine similarity
-                else:
-                    # For NanoBERT, keep existing distance calculation
-                    return float(distance)
-            
-            # Process results and remove duplicates
+            results = []
             for distance, idx in zip(D[0], I[0]):
                 if idx == -1:
-                    print(f"Skipping invalid index: {idx}")
-                    continue
-                    
-                idx = int(idx)
-                
-                if idx not in self.metadata:
-                    print(f"Warning: Index {idx} not found in metadata")
                     continue
                 
-                metadata_entry = self.metadata[idx]
-                doi = metadata_entry['doi']
-                paragraph_id = metadata_entry['paragraph_id']
+                metadata_entry = self.metadata.get(idx)
+                if not metadata_entry:
+                    continue
                 
-                # Create a unique key combining DOI and paragraph_id
-                unique_key = f"{doi}_{paragraph_id}"
-                
-                # Calculate adjusted similarity score
-                similarity_score = calculate_similarity(distance)
-                
-                # Only keep if it's a new DOI or a better match for this paragraph
-                if unique_key not in unique_results or similarity_score > unique_results[unique_key]['similarity_score']:
-                    unique_results[unique_key] = {
-                        'distance': float(distance),
-                        'similarity_score': similarity_score,
-                        'title': metadata_entry['title'],
-                        'doi': doi,
-                        'paragraph_id': paragraph_id,
-                        'chunk_id': metadata_entry['chunk_id']
-                    }
-                
-                # Break if we have enough unique results
-                if len(unique_results) >= top_k:
-                    # Check if we have enough different DOIs
-                    unique_dois = len(set(r['doi'] for r in unique_results.values()))
-                    if unique_dois >= top_k:
-                        break
+                results.append({
+                    'distance': float(distance),
+                    'title': metadata_entry['title'],
+                    'doi': metadata_entry['doi'],
+                    'paragraph_id': metadata_entry['paragraph_id'],
+                    'chunk_id': metadata_entry['chunk_id']
+                })
             
-            # Convert dictionary to list and sort by similarity score
-            results = sorted(
-                unique_results.values(),
-                key=lambda x: x['similarity_score'],
-                reverse=True  # Higher similarity scores are better
-            )
+            # Sort results by distance (lower is better)
+            results.sort(key=lambda x: x['distance'])
             
-            # Take only top_k results
             return results[:top_k]
             
         except Exception as e:
