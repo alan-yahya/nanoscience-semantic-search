@@ -18,11 +18,7 @@ const ChatContainer = ({ isRecursive, faissCount, vectorDim }) => {
 
     // Initial welcome message
     React.useEffect(() => {
-        setMessages([
-            {
-                type: 'assistant',
-                content: 'Please select a vector representation and segmentation strategy.'
-            },
+        const initialMessages = [
             {
                 type: 'assistant',
                 content: `
@@ -32,26 +28,10 @@ const ChatContainer = ({ isRecursive, faissCount, vectorDim }) => {
                     Please describe the topics or content of the nanoscience papers you want to search for.
                 `
             }
-        ]);
-        
-        // Add message for changing to NanoBERT with standard segmentation strategy after 1 second
-        setTimeout(() => {
-            setMessages(prevMessages => [
-                ...prevMessages,
-                {
-                    type: 'assistant',
-                    content: 'Switched to NanoBERT with standard segmentation strategy.'
-                }
-            ]);
-        }, 1000);
-    }, [faissCount, vectorDim]);
+        ];
 
-    // Remove initial message after the next message
-    React.useEffect(() => {
-        if (messages.length > 1) {
-            setMessages(prevMessages => prevMessages.filter((_, index) => index !== 0));
-        }
-    }, [messages]);
+        setMessages(initialMessages);
+    }, [faissCount, vectorDim]);
 
     // Scroll to bottom when messages change
     React.useEffect(() => {
