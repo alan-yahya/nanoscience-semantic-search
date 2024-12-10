@@ -2,6 +2,13 @@
 
 {% block content %}
 <div class="chat-wrapper">
+    <!-- Add Toggle Button -->
+    <div class="toggle-container">
+        <button id="toggleEmbeddings" class="btn btn-outline-secondary btn-sm">
+            Using: <span id="embeddingType">{{ 'Recursive' if using_recursive else 'Standard' }}</span> Embeddings
+        </button>
+    </div>
+    
     <!-- Chat Container -->
     <div class="chat-scroll-area">
         <div class="chat-container container-fluid" id="chatContainer">
@@ -104,6 +111,26 @@
     @keyframes bounce {
         0%, 80%, 100% { transform: scale(0); }
         40% { transform: scale(1); }
+    }
+
+    /* Add these styles */
+    .toggle-container {
+        position: fixed;
+        top: 70px;  /* Below navbar */
+        right: 20px;
+        z-index: 1000;
+        padding: 10px;
+    }
+    
+    #toggleEmbeddings {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.5rem;
+        background-color: white;
+        border-color: #ccc;
+    }
+    
+    #toggleEmbeddings:hover {
+        background-color: #f8f9fa;
     }
 </style>
 {% endblock %}
@@ -257,6 +284,61 @@
         if (e.key === 'Enter') {
             sendMessage();
         }
+    });
+
+    document.getElementById('toggleEmbeddings').addEventListener('click', function() {
+        console.log('Toggle button clicked');
+        
+        // Disable button during request
+        this.disabled = true;
+        console.log('Button disabled');
+        
+        fetch('/toggle_embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            console.log('Response received:', response);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Data received:', data);
+            if (data.success) {
+                console.log('Toggle successful');
+                // Update button text
+                document.getElementById('embeddingType').textContent = 
+                    data.using_recursive ? 'Recursive' : 'Standard';
+                
+                // Clear chat history
+                const chatContainer = document.getElementById('chatContainer');
+                chatContainer.innerHTML = '';
+                
+                // Add new stats message
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    Number of FAISS Vectors: ${data.vector_count}<br>
+                    Vector Dimensions: ${data.vector_dim}<br><br>
+                    Please describe the topics or content of the nanoscience papers you want to search for.
+                `;
+                chatContainer.appendChild(statsDiv);
+            } else {
+                console.error('Toggle failed:', data.error);
+                alert('Failed to toggle embeddings. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert('Error toggling embeddings. Please try again.');
+        })
+        .finally(() => {
+            // Re-enable button
+            this.disabled = false;
+            console.log('Button re-enabled');
+        });
     });
 </script>
 {% endblock %} 

@@ -3,7 +3,7 @@ import ctypes
 import pickle
 import numpy as np
 import requests
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from dotenv import load_dotenv
 from datasets import load_dataset
 from transformers import AutoTokenizer
@@ -17,12 +17,14 @@ app = Flask(__name__,
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates')),
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), 'static')))
 
+app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
+
 class NanoBERTSearchEngine:
     def __init__(self, 
                  hf_api_key=None, 
                  model_name="Flamenco43/NanoBERT-V2", 
-                 checkpoint_file="paragraph_embeddings.faiss", 
-                 metadata_file="paragraph_metadata.pkl"):
+                 checkpoint_file="recursive_paragraph_embeddings.faiss", 
+                 metadata_file="recursive_paragraph_metadata.pkl"):
         # Hugging Face API Key (can be passed as environment variable)
         self.hf_api_key = hf_api_key or os.getenv('HF_API_KEY')
         if not self.hf_api_key:
@@ -277,14 +279,17 @@ def index():
         # Get FAISS index stats from the search_engine instance
         faiss_count = search_engine.index.ntotal
         vector_dim = search_engine.index.d
+        using_recursive = session.get('use_recursive', True)
     except Exception as e:
         print(f"Error getting FAISS stats: {e}")
         faiss_count = 0
         vector_dim = 0
+        using_recursive = True
     
     return render_template('index.html', 
                          faiss_count=faiss_count,
-                         vector_dim=vector_dim)
+                         vector_dim=vector_dim,
+                         using_recursive=using_recursive)
 
 @app.route('/search', methods=['POST'])
 def search_documents():
@@ -360,6 +365,54 @@ def add_header(response):
     if response.headers['Content-Type'] == 'application/javascript':
         response.headers['Content-Type'] = 'text/babel'
     return response
+
+@app.route('/toggle_embeddings', methods=['POST'])
+def toggle_embeddings():
+    """Toggle between recursive and standard embeddings"""
+    try:
+        # Add debug logging
+        print("\n=== Toggle Embeddings Request ===")
+        print(f"Current session state: {dict(session)}")
+        
+        # Toggle the current setting
+        current = session.get('use_recursive', True)
+        session['use_recursive'] = not current
+        
+        print(f"New session state: {dict(session)}")
+        print(f"Switching to {'recursive' if session['use_recursive'] else 'standard'} embeddings")
+        
+        # Reinitialize search engine with new files
+        global search_engine
+        if session['use_recursive']:
+            print("Loading recursive embeddings...")
+            search_engine = NanoBERTSearchEngine(
+                checkpoint_file="recursive_paragraph_embeddings.faiss",
+                metadata_file="recursive_paragraph_metadata.pkl"
+            )
+        else:
+            print("Loading standard embeddings...")
+            search_engine = NanoBERTSearchEngine(
+                checkpoint_file="paragraph_embeddings.faiss",
+                metadata_file="paragraph_metadata.pkl"
+            )
+        
+        response_data = {
+            "success": True,
+            "using_recursive": session['use_recursive'],
+            "vector_count": search_engine.index.ntotal,
+            "vector_dim": search_engine.index.d
+        }
+        print(f"Response data: {response_data}")
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"Toggle error: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 # For Coolify deployment
 if __name__ == '__main__':
