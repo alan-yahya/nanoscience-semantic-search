@@ -9,6 +9,10 @@ const ChatBox = ({ faissCount, vectorDim }) => {
         setMessages([
             {
                 type: 'assistant',
+                content: 'Please select a vector representation and segmentation strategy.'
+            },
+            {
+                type: 'assistant',
                 content: `
                     <strong>Database Statistics</strong><br>
                     Number of FAISS Vectors: ${faissCount}<br>

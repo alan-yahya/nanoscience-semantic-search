@@ -4,15 +4,21 @@ const ChatContainer = ({ isRecursive, faissCount, vectorDim }) => {
 
     // Initial welcome message
     React.useEffect(() => {
-        setMessages([{
-            type: 'assistant',
-            content: `
-                <strong>Database Statistics</strong><br><br>
-                Number of FAISS Vectors: ${faissCount}<br>
-                Vector Dimensions: ${vectorDim}<br><br>
-                Please describe the topics or content of the nanoscience papers you want to search for.
-            `
-        }]);
+        setMessages([
+            {
+                type: 'assistant',
+                content: 'Please select a vector representation and segmentation strategy.'
+            },
+            {
+                type: 'assistant',
+                content: `
+                    <strong>Database Statistics</strong><br><br>
+                    Number of FAISS Vectors: ${faissCount}<br>
+                    Vector Dimensions: ${vectorDim}<br><br>
+                    Please describe the topics or content of the nanoscience papers you want to search for.
+                `
+            }
+        ]);
     }, [faissCount, vectorDim]);
 
     // Scroll to bottom when messages change
