@@ -185,7 +185,7 @@
         this.disabled = true;
         
         // Add loading message
-        const loadingDiv = createLoadingMessage();
+        const loadingDiv = createLoadingMessage("Switching Databases");
         chatContainer.appendChild(loadingDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight;
 
@@ -290,11 +290,11 @@
         `;
     }
 
-    function createLoadingMessage() {
+    function createLoadingMessage(message = "Searching papers") {
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'loading-message';
         loadingDiv.innerHTML = `
-            Searching papers
+            ${message}
             <div class="loading-dots">
                 <span></span>
                 <span></span>
