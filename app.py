@@ -415,16 +415,17 @@ def toggle_embeddings():
             current_type = session.get('embedding_type', 'nanobert')
             session['embedding_type'] = 'openai' if current_type == 'nanobert' else 'nanobert'
             
-            # Set appropriate files based on embedding type and segmentation strategy
-            is_recursive = session.get('use_recursive', True)
+            # Set appropriate files based on embedding type
             if session['embedding_type'] == 'openai':
                 checkpoint_file = "openai-embeddings.faiss"
                 metadata_file = "openai-embeddings_metadata.pkl"
             else:
+                # Use the current segmentation strategy to determine the file
+                is_recursive = session.get('use_recursive', True)
                 checkpoint_file = "recursive_paragraph_embeddings.faiss" if is_recursive else "paragraph_embeddings.faiss"
                 metadata_file = "recursive_paragraph_metadata.pkl" if is_recursive else "paragraph_metadata.pkl"
         
-        else:  # toggle_type == 'segmentation_strategy'
+        elif toggle_type == 'segmentation_strategy':
             # Toggle between recursive and standard (only for NanoBERT)
             if session.get('embedding_type', 'openai') == 'openai':
                 return jsonify({
