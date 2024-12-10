@@ -104,9 +104,8 @@ class NanoBERTSearchEngine:
                     model=self.embedding_model,
                     input=text
                 )
-                vector = np.array(response.data[0].embedding, dtype=np.float32)
+                vector = np.array(response['data'][0]['embedding'], dtype=np.float32)
                 return vector.reshape(1, -1)
-                
             except Exception as e:
                 print(f"OpenAI embedding error (attempt {retries + 1}): {str(e)}")
                 if "rate limit" in str(e).lower():
