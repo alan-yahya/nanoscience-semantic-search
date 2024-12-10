@@ -5,6 +5,13 @@
     <!-- Add Toggle Button -->
     <div class="search-settings">
         <div class="settings-group">
+            <label for="vectorRepresentation">Vector Representation:</label>
+            <select id="vectorRepresentation" class="form-select form-select-sm">
+                <option value="nanobert" selected>NanoBERT</option>
+                <option value="openai">OpenAI</option>
+            </select>
+        </div>
+        <div class="settings-group">
             <label for="segmentationStrategy">Segmentation Strategy:</label>
             <select id="segmentationStrategy" class="form-select form-select-sm">
                 <option value="recursive" {{ 'selected' if using_recursive else '' }}>Recursive</option>
@@ -148,6 +155,11 @@
         width: 200px;
         font-size: 0.9rem;
         border-color: #dee2e6;
+    }
+    
+    .settings-group select option[disabled] {
+        color: #6c757d;
+        font-style: italic;
     }
 </style>
 {% endblock %}
@@ -311,6 +323,58 @@
         }
     });
 
+    // Add event listener for vector representation changes
+    document.getElementById('vectorRepresentation').addEventListener('change', function() {
+        this.disabled = true;
+        
+        fetch('/toggle_embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                toggle_type: 'vector_representation'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update stats message
+                const chatContainer = document.getElementById('chatContainer');
+                const firstMessage = chatContainer.firstChild;
+                
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    <strong>FAISS Index:</strong> ${data.embedding_type === 'openai' ? 'openai-embeddings' : 
+                        (data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
+                    Number of FAISS Vectors: ${data.vector_count}<br>
+                    Number of Unique DOIs: ${data.unique_dois}<br>
+                    Vector Dimensions: ${data.vector_dim}<br><br>
+                    Please describe the topics or content of the nanoscience papers you want to search for.
+                `;
+                
+                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                    chatContainer.replaceChild(statsDiv, firstMessage);
+                } else {
+                    chatContainer.insertBefore(statsDiv, firstMessage);
+                }
+            } else {
+                alert(data.error || 'Failed to toggle vector representation');
+                this.value = data.embedding_type === 'openai' ? 'nanobert' : 'openai';  // Reset to previous value
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error toggling vector representation');
+            this.value = 'nanobert';  // Reset to NanoBERT on error
+        })
+        .finally(() => {
+            this.disabled = false;
+        });
+    });
+
     document.getElementById('segmentationStrategy').addEventListener('change', function() {
         console.log('Toggle button clicked');
         
@@ -325,7 +389,10 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify({
+                toggle_type: 'segmentation_strategy'
+            })
         })
         .then(response => {
             console.log('Response received:', response);
