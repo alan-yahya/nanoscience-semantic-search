@@ -5,17 +5,34 @@ const ChatBox = ({ faissCount, vectorDim }) => {
     const chatContainerRef = React.useRef(null);
 
     React.useEffect(() => {
-        // Add initial stats message
-        setMessages([{
-            type: 'assistant',
-            content: `
-                <strong>Database Statistics</strong><br>
-                Number of FAISS Vectors: ${faissCount}<br>
-                Vector Dimensions: ${vectorDim}<br><br>
-                How can I help you search through the nanoscience papers?
-            `
-        }]);
+        // Add initial stats message and a welcome message
+        setMessages([
+            {
+                type: 'assistant',
+                content: 'Please select a vector representation and segmentation strategy.'
+            },
+            {
+                type: 'assistant',
+                content: `
+                    <strong>Database Statistics</strong><br>
+                    Number of FAISS Vectors: ${faissCount}<br>
+                    Vector Dimensions: ${vectorDim}<br><br>
+                    How can I help you search through the nanoscience papers?
+                `
+            },
+            {
+                type: 'assistant',
+                content: 'Welcome back! How can I assist you with your nanoscience paper search today?'
+            }
+        ]);
     }, [faissCount, vectorDim]);
+
+    // Remove initial message after the next message
+    React.useEffect(() => {
+        if (messages.length > 1) {
+            setMessages(prevMessages => prevMessages.filter((_, index) => index !== 0));
+        }
+    }, [messages]);
 
     React.useEffect(() => {
         // Scroll to bottom when messages change
@@ -39,10 +56,22 @@ const ChatBox = ({ faissCount, vectorDim }) => {
         if (!inputValue.trim()) return;
 
         // Add user message
-        setMessages(prev => [...prev, {
-            type: 'user',
-            content: inputValue
-        }]);
+        setMessages(prev => [
+            ...prev,
+            {
+                type: 'user',
+                content: inputValue
+            },
+            {
+                type: 'assistant',
+                content: `
+                    <strong>Database Details</strong><br>
+                    <strong>FAISS DB:</strong> ${faissCount > 0 ? 'Loaded' : 'Not Loaded'}<br>
+                    Number of FAISS Vectors: ${faissCount}<br>
+                    Vector Dimensions: ${vectorDim}<br>
+                `
+            }
+        ]);
 
         try {
             const response = await fetch('/search', {

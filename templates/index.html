@@ -2,14 +2,34 @@
 
 {% block content %}
 <div class="chat-wrapper">
-    <!-- Chat Container -->
-    <div class="chat-scroll-area">
-        <div class="chat-container container-fluid" id="chatContainer">
-            <!-- Messages will be added here -->
+    <!-- Add Toggle Button -->
+    <div class="search-settings">
+        <div class="settings-group">
+            <label for="vectorRepresentation">Vector Representation:</label>
+            <select id="vectorRepresentation" class="form-select form-select-sm">
+                <option value="nanobert">NanoBERT</option>
+                <option value="openai">OpenAI</option>
+            </select>
+        </div>
+        <div class="settings-group">
+            <label for="segmentationStrategy">Segmentation Strategy:</label>
+            <select id="segmentationStrategy" class="form-select form-select-sm">
+                <option value="recursive">Recursive</option>
+                <option value="standard">Standard</option>
+            </select>
         </div>
     </div>
     
-    <!-- Fixed Input Bar at Bottom -->
+    <!-- Chat Container -->
+    <div class="chat-scroll-area">
+        <div class="chat-container container-fluid" id="chatContainer">
+            <div class="assistant-message">
+                Please select a vector representation and segmentation strategy.
+            </div>
+        </div>
+    </div>
+    
+    <!-- Input Bar -->
     <div class="input-bar">
         <div class="container-fluid">
             <div class="input-group">
@@ -105,24 +125,121 @@
         0%, 80%, 100% { transform: scale(0); }
         40% { transform: scale(1); }
     }
+
+    /* Add these styles */
+    .search-settings {
+        position: fixed;
+        top: 70px;  /* Below navbar */
+        right: 20px;
+        z-index: 1000;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .settings-group {
+        margin-bottom: 0.5rem;
+    }
+    
+    .settings-group:last-child {
+        margin-bottom: 0;
+    }
+    
+    .settings-group label {
+        display: block;
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+        color: #6c757d;
+    }
+    
+    .settings-group select {
+        width: 200px;
+        font-size: 0.9rem;
+        border-color: #dee2e6;
+    }
+    
+    .settings-group select option[disabled] {
+        color: #6c757d;
+        font-style: italic;
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Add initial stats message when page loads
-    window.onload = function() {
-        const chatContainer = document.getElementById('chatContainer');
-        const statsDiv = document.createElement('div');
-        statsDiv.className = 'assistant-message';
-        statsDiv.innerHTML = `
-            <strong>Database Statistics</strong><br>
-            Number of FAISS Vectors: {{ faiss_count }}<br>
-            Vector Dimensions: {{ vector_dim }}<br><br>
-            Please describe the topics or content of the nanoscience papers you want to search for.
-        `;
-        chatContainer.appendChild(statsDiv);
-    };
+    // Set initial dropdown selections based on session data
+    document.addEventListener('DOMContentLoaded', function() {
+        const vectorRep = document.getElementById('vectorRepresentation');
+        const segStrategy = document.getElementById('segmentationStrategy');
+
+        fetch('/get_current_settings')
+            .then(response => response.json())
+            .then(data => {
+                vectorRep.value = data.embedding_type;
+                segStrategy.value = data.using_recursive ? 'recursive' : 'standard';
+            })
+            .catch(error => console.error('Error fetching current settings:', error));
+    });
+    document.getElementById('vectorRepresentation').addEventListener('change', function() {
+        this.disabled = true;
+        
+        fetch('/toggle_embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                toggle_type: 'vector_representation'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update stats message
+                const chatContainer = document.getElementById('chatContainer');
+                const firstMessage = chatContainer.firstChild;
+                
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    <strong>FAISS DB:</strong> ${data.embedding_type === 'openai' ? 'openai-embeddings' : 
+                        (data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
+                    Number of FAISS vectors: ${data.vector_count}<br>
+                    Number of unique papers: ${data.unique_dois}<br>
+                    Vector Dimensions: ${data.vector_dim}<br><br>
+                    Please describe the topics or content of the nanoscience papers you want to search for.
+                `;
+                
+                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                    chatContainer.replaceChild(statsDiv, firstMessage);
+                } else {
+                    chatContainer.insertBefore(statsDiv, firstMessage);
+                }
+
+                // Update segmentation strategy options
+                const segStrategy = document.getElementById('segmentationStrategy');
+                if (data.embedding_type === 'openai') {
+                    segStrategy.innerHTML = '<option value="standard" selected>Standard</option>';
+                } else {
+                    segStrategy.innerHTML = `
+                        <option value="recursive" ${data.using_recursive ? 'selected' : ''}>Recursive</option>
+                        <option value="standard" ${!data.using_recursive ? 'selected' : ''}>Standard</option>
+                    `;
+                }
+            } else {
+                alert(data.error || 'Failed to toggle vector representation');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error toggling vector representation');
+        })
+        .finally(() => {
+            this.disabled = false;
+        });
+    });
 
     function isValidResult(result) {
         // Check if title exists and is not empty
@@ -231,7 +348,19 @@
                     .join('');
                 
                 if (validResults) {
-                    assistantDiv.innerHTML = validResults;
+                    // Get current segmentation strategy
+                    const segStrategy = document.getElementById('segmentationStrategy');
+                    const strategyText = segStrategy ? segStrategy.options[segStrategy.selectedIndex].text : 'Unknown';
+                    
+                    // Get current vector representation
+                    const vectorRep = document.getElementById('vectorRepresentation');
+                    const vectorText = vectorRep ? vectorRep.options[vectorRep.selectedIndex].text : 'Unknown';
+                    
+                    assistantDiv.innerHTML = `
+                        <strong>Top Responses</strong><br>
+                        <em>Vector Representation: ${vectorText}</em><br>
+                        <em>Segmentation Strategy: ${strategyText}</em><br><br>
+                        ${validResults}`;
                 } else {
                     assistantDiv.textContent = 'No valid results found';
                 }
@@ -258,5 +387,98 @@
             sendMessage();
         }
     });
+
+    document.getElementById('segmentationStrategy').addEventListener('change', function() {
+        console.log('Toggle button clicked');
+        
+        // Disable button during request
+        this.disabled = true;
+        console.log('Button disabled');
+        
+        fetch('/toggle_embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                toggle_type: 'segmentation_strategy'
+            })
+        })
+        .then(response => {
+            console.log('Response received:', response);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Data received:', data);
+            if (data.success) {
+                console.log('Toggle successful');
+                
+                // Get chat container
+                const chatContainer = document.getElementById('chatContainer');
+                if (!chatContainer) {
+                    throw new Error('Chat container not found');
+                }
+                
+                // Create new stats message
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    <strong>FAISS DB:</strong> ${data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings'}<br>
+                    Number of FAISS Vectors: ${data.vector_count}<br>
+                    Number of Unique DOIs: ${data.unique_dois}<br>
+                    Vector Dimensions: ${data.vector_dim}<br><br>
+                    Please describe the topics or content of the nanoscience papers you want to search for.
+                `;
+                
+                // Find and update first message
+                const firstMessage = chatContainer.firstChild;
+                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                    chatContainer.replaceChild(statsDiv, firstMessage);
+                } else {
+                    chatContainer.insertBefore(statsDiv, firstMessage);
+                }
+            } else {
+                console.error('Toggle failed:', data.error);
+                throw new Error(data.error || 'Toggle failed');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert(`Error toggling embeddings: ${error.message}`);
+        })
+        .finally(() => {
+            // Re-enable button
+            this.disabled = false;
+            console.log('Button re-enabled');
+        });
+    });
+    function initializeChatWithDBInfo() {
+        // Get chat container
+        const chatContainer = document.getElementById('chatContainer');
+        if (!chatContainer) {
+            console.error('Chat container not found');
+            return;
+        }
+
+        // Create new stats message with default values
+        const statsDiv = document.createElement('div');
+        statsDiv.className = 'assistant-message';
+        statsDiv.innerHTML = `
+            <strong>Database Statistics</strong><br>
+            <strong>FAISS DB:</strong> ${'nanobert' === 'openai' ? 'openai-embeddings' : 
+                (false ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
+            Number of FAISS Vectors: ${faissCount}<br>
+            Vector Dimensions: ${vectorDim}<br><br>
+            Please describe the topics or content of the nanoscience papers you want to search for.
+        `;
+
+        // Add stats message to chat
+        chatContainer.appendChild(statsDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 </script>
 {% endblock %} 

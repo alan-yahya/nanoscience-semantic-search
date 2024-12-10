@@ -3,11 +3,14 @@ import ctypes
 import pickle
 import numpy as np
 import requests
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from dotenv import load_dotenv
 from datasets import load_dataset
 from transformers import AutoTokenizer
 import faiss
+import time
+from openai import OpenAI
+import traceback
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,71 +20,106 @@ app = Flask(__name__,
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates')),
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), 'static')))
 
+app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
+
 class NanoBERTSearchEngine:
     def __init__(self, 
                  hf_api_key=None, 
+                 openai_api_key=None,
                  model_name="Flamenco43/NanoBERT-V2", 
-                 checkpoint_file="paragraph_embeddings.faiss", 
-                 metadata_file="paragraph_metadata.pkl"):
-        # Hugging Face API Key (can be passed as environment variable)
-        self.hf_api_key = hf_api_key or os.getenv('HF_API_KEY')
-        if not self.hf_api_key:
-            raise ValueError("Hugging Face API Key is required. Set HF_API_KEY environment variable.")
+                 checkpoint_file="recursive_paragraph_embeddings.faiss", 
+                 metadata_file="recursive_paragraph_metadata.pkl",
+                 embedding_type="nanobert"):
         
-        print(f"\nInitializing with model: {model_name}")
-        self.model_name = model_name
-        self.inference_url = f"https://api-inference.huggingface.co/models/{model_name}"
+        self.embedding_type = embedding_type
+        # Get embedding dimension from FAISS index
+        self.embedding_dim = None  # Will be set after loading FAISS index
         
-        # Load FAISS index and metadata
+        if embedding_type == "nanobert":
+            # Existing NanoBERT initialization
+            self.hf_api_key = hf_api_key or os.getenv('HF_API_KEY')
+            if not self.hf_api_key:
+                raise ValueError("Hugging Face API Key is required for NanoBERT embeddings")
+            
+            self.model_name = model_name
+            self.inference_url = f"https://api-inference.huggingface.co/models/{model_name}"
+            
+        elif embedding_type == "openai":
+            # OpenAI initialization
+            self.openai_api_key = openai_api_key or os.getenv('OPENAI_API_KEY')
+            if not self.openai_api_key:
+                raise ValueError("OpenAI API Key is required for OpenAI embeddings")
+            
+            self.openai_client = OpenAI(api_key=self.openai_api_key)
+            self.embedding_model = "text-embedding-3-large"
+            
+        # Load FAISS index and metadata (common for both)
         print("\nLoading FAISS index...")
         self.index = faiss.read_index(checkpoint_file)
+        self.embedding_dim = self.index.d  # Set embedding dimension from FAISS index
         print(f"FAISS index type: {type(self.index)}")
-        print(f"FAISS index description: {self.index}")
         print(f"Number of vectors in index: {self.index.ntotal}")
         print(f"Vector dimension: {self.index.d}")
         
-        print("\nLoading metadata...")
+        # Load metadata
         with open(metadata_file, "rb") as f:
             raw_metadata = pickle.load(f)
+        self.metadata = self._process_metadata(raw_metadata)
         
-        print("Raw metadata keys:", raw_metadata.keys())
-        print(f"Raw metadata types: {[(k, type(v), len(v) if hasattr(v, '__len__') else 'N/A') for k, v in raw_metadata.items()]}")
-        
-        # Convert metadata to the expected format
-        self.metadata = {}
+        # Initialize tokenizer if using NanoBERT
+        if embedding_type == "nanobert":
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    def _process_metadata(self, raw_metadata):
+        """Process raw metadata into the expected format"""
+        metadata = {}
         titles = raw_metadata.get('titles', [])
         dois = raw_metadata.get('dois', [])
         paragraph_ids = raw_metadata.get('paragraph_ids', [])
         chunk_ids = raw_metadata.get('chunk_ids', [])
         
-        print(f"\nTitles length: {len(titles)}")
-        print(f"DOIs length: {len(dois)}")
-        print(f"Paragraph IDs length: {len(paragraph_ids)}")
-        print(f"Chunk IDs length: {len(chunk_ids)}")
-        
         for idx in range(len(titles)):
-            self.metadata[idx] = {
+            metadata[idx] = {
                 'title': titles[idx] if idx < len(titles) else "Title not available",
                 'doi': dois[idx] if idx < len(dois) else "DOI not available",
                 'paragraph_id': paragraph_ids[idx] if idx < len(paragraph_ids) else "Paragraph ID not available",
                 'chunk_id': chunk_ids[idx] if idx < len(chunk_ids) else "Chunk ID not available"
             }
         
-        print(f"\nProcessed {len(self.metadata)} metadata entries")
-        
-        # Initialize tokenizer
-        print("Loading tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        print("Tokenizer loaded successfully")
-        
-        # Get dimension from the index
-        self.embedding_dim = self.index.d
-        print(f"FAISS index dimension: {self.embedding_dim}")
+        return metadata
 
     def encode_text(self, text):
-        """
-        Vectorize text using Hugging Face Inference API
-        """
+        """Vectorize text using either NanoBERT or OpenAI"""
+        if self.embedding_type == "nanobert":
+            return self._encode_text_nanobert(text)
+        else:
+            return self._encode_text_openai(text)
+
+    def _encode_text_openai(self, text, max_retries=3):
+        """Vectorize text using OpenAI embeddings API"""
+        retries = 0
+        while retries < max_retries:
+            try:
+                response = self.openai_client.embeddings.create(
+                    model=self.embedding_model,
+                    input=text
+                )
+                vector = np.array(response.data[0].embedding, dtype=np.float32)
+                return vector.reshape(1, -1)
+            except Exception as e:
+                print(f"OpenAI embedding error (attempt {retries + 1}): {str(e)}")
+                if "rate limit" in str(e).lower():
+                    time.sleep(10 * (2 ** retries))
+                    retries += 1
+                else:
+                    print(f"Error in OpenAI encode_text: {str(e)}")
+                    return np.zeros((1, self.index.d), dtype=np.float32)
+        
+        print(f"Failed to get OpenAI embedding after {max_retries} attempts")
+        return np.zeros((1, self.index.d), dtype=np.float32)
+
+    def _encode_text_nanobert(self, text):
+        """Original NanoBERT encoding method"""
         headers = {
             "Authorization": f"Bearer {self.hf_api_key}",
             "Content-Type": "application/json"
@@ -186,83 +224,38 @@ class NanoBERTSearchEngine:
             return f"Error retrieving chunk: {str(e)}"
 
     def search(self, query, top_k=5):
+        """Search for similar documents using query embedding"""
         try:
             query_vector = self.encode_text(query)
             
-            # Get more results initially
-            D, I = self.index.search(query_vector, top_k * 5)  # Increased multiplier
+            # Perform search on the FAISS index
+            D, I = self.index.search(query_vector, top_k)
             
             print("\nRaw search results:")
             for d, i in zip(D[0], I[0]):
                 print(f"Distance: {d}, Index: {i}")
             
-            # Create a dictionary to track unique results by DOI and paragraph
-            unique_results = {}
-            
-            # Process results and remove duplicates
+            results = []
             for distance, idx in zip(D[0], I[0]):
                 if idx == -1:
-                    print(f"Skipping invalid index: {idx}")
-                    continue
-                    
-                idx = int(idx)
-                
-                if idx not in self.metadata:
-                    print(f"Warning: Index {idx} not found in metadata")
                     continue
                 
-                metadata_entry = self.metadata[idx]
-                doi = metadata_entry['doi']
-                paragraph_id = metadata_entry['paragraph_id']
+                metadata_entry = self.metadata.get(idx)
+                if not metadata_entry:
+                    continue
                 
-                # Create a unique key combining DOI and paragraph_id
-                unique_key = f"{doi}_{paragraph_id}"
-                
-                print(f"\nProcessing result:")
-                print(f"Index: {idx}")
-                print(f"Distance: {distance}")
-                print(f"DOI: {doi}")
-                print(f"Paragraph ID: {paragraph_id}")
-                print(f"Title: {metadata_entry['title']}")
-                
-                # Only keep if it's a new DOI or a better match for this paragraph
-                if unique_key not in unique_results or distance < unique_results[unique_key]['distance']:
-                    unique_results[unique_key] = {
-                        'distance': float(distance),
-                        'title': metadata_entry['title'],
-                        'doi': doi,
-                        'paragraph_id': paragraph_id,
-                        'chunk_id': metadata_entry['chunk_id']
-                    }
-                
-                # Break if we have enough unique results
-                if len(unique_results) >= top_k:
-                    # Check if we have enough different DOIs
-                    unique_dois = len(set(r['doi'] for r in unique_results.values()))
-                    if unique_dois >= top_k:
-                        break
+                results.append({
+                    'distance': float(distance),
+                    'title': metadata_entry['title'],
+                    'doi': metadata_entry['doi'],
+                    'paragraph_id': metadata_entry['paragraph_id'],
+                    'chunk_id': metadata_entry['chunk_id']
+                })
             
-            # Convert dictionary to list and sort by distance
-            results = list(unique_results.values())
+            # Sort results by distance (lower is better)
             results.sort(key=lambda x: x['distance'])
             
-            # Group by DOI and take the best result for each
-            doi_results = {}
-            for result in results:
-                doi = result['doi']
-                if doi not in doi_results or result['distance'] < doi_results[doi]['distance']:
-                    doi_results[doi] = result
-            
-            # Final results sorted by distance
-            final_results = list(doi_results.values())
-            final_results.sort(key=lambda x: x['distance'])
-            final_results = final_results[:top_k]
-            
-            print(f"\nFinal results:")
-            for r in final_results:
-                print(f"Distance: {r['distance']}, DOI: {r['doi']}, Paragraph: {r['paragraph_id']}")
-            
-            return final_results
+            return results[:top_k]
             
         except Exception as e:
             print(f"Error in search method: {str(e)}")
@@ -277,14 +270,22 @@ def index():
         # Get FAISS index stats from the search_engine instance
         faiss_count = search_engine.index.ntotal
         vector_dim = search_engine.index.d
+        # Set default segmentation strategy and vector representation
+        using_recursive = session.setdefault('use_recursive', False)
+        session.setdefault('embedding_type', 'nanobert')
+        unique_dois = len(set(doi for metadata in search_engine.metadata.values() for doi in [metadata['doi']]))
     except Exception as e:
         print(f"Error getting FAISS stats: {e}")
         faiss_count = 0
         vector_dim = 0
+        using_recursive = True
+        unique_dois = 0
     
     return render_template('index.html', 
                          faiss_count=faiss_count,
-                         vector_dim=vector_dim)
+                         vector_dim=vector_dim,
+                         using_recursive=using_recursive,
+                         unique_dois=unique_dois)
 
 @app.route('/search', methods=['POST'])
 def search_documents():
@@ -361,7 +362,96 @@ def add_header(response):
         response.headers['Content-Type'] = 'text/babel'
     return response
 
+@app.route('/get_current_settings', methods=['GET'])
+def get_current_settings():
+    """Provide current embedding type and segmentation strategy to the frontend"""
+    try:
+        embedding_type = session.get('embedding_type', 'nanobert')
+        using_recursive = session.get('use_recursive', False)
+        return jsonify({
+            "embedding_type": embedding_type,
+            "using_recursive": using_recursive
+        })
+    except Exception as e:
+        print(f"Error fetching current settings: {str(e)}")
+        return jsonify({
+            "error": str(e)
+        }), 500
+@app.route('/toggle_embeddings', methods=['POST'])
+def toggle_embeddings():
+    """Toggle between different embedding types and strategies"""
+    try:
+        # Get toggle type and value from request
+        data = request.get_json()
+        toggle_type = data.get('toggle_type')
+        
+        if toggle_type == 'vector_representation':
+            # Toggle between NanoBERT and OpenAI
+            current_type = session.get('embedding_type', 'nanobert')
+            session['embedding_type'] = 'openai' if current_type == 'nanobert' else 'nanobert'
+            
+            # Set appropriate files based on embedding type
+            if session['embedding_type'] == 'openai':
+                checkpoint_file = "openai-embeddings.faiss"
+                metadata_file = "openai-embeddings_metadata.pkl"
+            else:
+                # Use the current segmentation strategy to determine the file
+                is_recursive = session.get('use_recursive', True)
+                checkpoint_file = "recursive_paragraph_embeddings.faiss" if is_recursive else "paragraph_embeddings.faiss"
+                metadata_file = "recursive_paragraph_metadata.pkl" if is_recursive else "paragraph_metadata.pkl"
+        
+        elif toggle_type == 'segmentation_strategy':
+            # Toggle between recursive and standard (only for NanoBERT)
+            if session.get('embedding_type', 'openai') == 'openai':
+                return jsonify({
+                    "success": False,
+                    "error": "Cannot change segmentation strategy while using OpenAI embeddings"
+                }), 400
+            
+            current = session.get('use_recursive', True)
+            session['use_recursive'] = not current
+            
+            checkpoint_file = "recursive_paragraph_embeddings.faiss" if session['use_recursive'] else "paragraph_embeddings.faiss"
+            metadata_file = "recursive_paragraph_metadata.pkl" if session['use_recursive'] else "paragraph_metadata.pkl"
+        
+        # Reinitialize search engine
+        global search_engine
+        search_engine = NanoBERTSearchEngine(
+            checkpoint_file=checkpoint_file,
+            metadata_file=metadata_file,
+            embedding_type=session.get('embedding_type', 'nanobert')
+        )
+        
+        # Get unique DOIs count
+        unique_dois = len(set(doi for metadata in search_engine.metadata.values() for doi in [metadata['doi']]))
+        
+        response_data = {
+            "success": True,
+            "embedding_type": session.get('embedding_type', 'nanobert'),
+            "using_recursive": session['use_recursive'],
+            "vector_count": search_engine.index.ntotal,
+            "vector_dim": search_engine.index.d,
+            "unique_dois": unique_dois
+        }
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"Toggle error: {str(e)}")
+        print("Full traceback:")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+#For local testing
+if __name__ == '__main__':
+    app.run(
+        debug='true'
+    )
+
 # For Coolify deployment
+'''
 if __name__ == '__main__':
     # Run the Flask app
     port = int(os.environ.get('PORT', 3000))
@@ -370,5 +460,6 @@ if __name__ == '__main__':
     app.run(
         host=host,
         port=port,
-        debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+        debug='true'
     )
+'''
