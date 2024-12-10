@@ -45,10 +45,22 @@ const ChatBox = ({ faissCount, vectorDim }) => {
         if (!inputValue.trim()) return;
 
         // Add user message
-        setMessages(prev => [...prev, {
-            type: 'user',
-            content: inputValue
-        }]);
+        setMessages(prev => [
+            ...prev,
+            {
+                type: 'user',
+                content: inputValue
+            },
+            {
+                type: 'assistant',
+                content: `
+                    <strong>Database Details</strong><br>
+                    <strong>FAISS DB:</strong> ${faissCount > 0 ? 'Loaded' : 'Not Loaded'}<br>
+                    Number of FAISS Vectors: ${faissCount}<br>
+                    Vector Dimensions: ${vectorDim}<br>
+                `
+            }
+        ]);
 
         try {
             const response = await fetch('/search', {
