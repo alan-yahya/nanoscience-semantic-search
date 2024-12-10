@@ -18,6 +18,7 @@ const ChatBox = ({ faissCount, vectorDim }) => {
                 type: 'assistant',
                 content: `
                     <strong>Database Statistics</strong><br>
+                    <strong>FAISS DB:</strong> openai-embeddings<br>
                     Number of FAISS Vectors: ${faissCount}<br>
                     Vector Dimensions: ${vectorDim}
                 `

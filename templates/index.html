@@ -476,10 +476,9 @@
         statsDiv.className = 'assistant-message';
         statsDiv.innerHTML = `
             <strong>Database Statistics</strong><br>
-            <strong>FAISS DB:</strong> ${'nanobert' === 'openai' ? 'openai-embeddings' : 
-                (false ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
+            <strong>FAISS DB:</strong> openai-embeddings<br>
             Number of FAISS Vectors: ${faissCount}<br>
-            Vector Dimensions: ${vectorDim}<br><br>
+            Vector Dimensions: ${vectorDim}
         `;
 
         // Add stats message to chat
