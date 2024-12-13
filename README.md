@@ -20,13 +20,14 @@ NanoSearch is a semantic search engine for nanoscience papers. It compares vario
    cd nanosearch   ```
 
 2. Set up environment variables:   ```bash
-   cp .env.example .env
-   # Edit .env with your API keys:
-   # - HF_API_KEY (Hugging Face)
-   # - OPENAI_API_KEY (OpenAI)
-   # - FLASK_SECRET_KEY   ```
+   cp .env.example .env ```
 
-3. Using Docker:   ```bash
+   Edit .env with your API keys:
+   - HF_API_KEY (Hugging Face)
+   - OPENAI_API_KEY (OpenAI)
+   - FLASK_SECRET_KEY
+
+4. Using Docker:   ```bash
    docker build -t nanosearch .
    docker run -p 3000:3000 nanosearch   ```
 
@@ -34,4 +35,4 @@ NanoSearch is a semantic search engine for nanoscience papers. It compares vario
    pip install -r requirements.txt
    python app.py   ```
 
-4. Access the application at `http://localhost:3000`
+5. Access the application at `http://localhost:3000`
