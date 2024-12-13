@@ -1,0 +1,26 @@
+# Environment files
+.env
+.env.*
+
+# FAISS files
+*.faiss
+
+# Pickle files
+*.pkl
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE files
+.vscode/
+.idea/
+
+# Git files
+.git/
+.gitignore
+
+# Misc
+*.log
+.DS_Store 

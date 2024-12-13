@@ -1,0 +1,26 @@
+# FAISS files
+*.faiss
+
+# Pickle files (often used with FAISS)
+*.pkl
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files
+.env
+.env.*
+
+# NumPy array files (used for embeddings)
+*.npy
+
+# IDE files
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db 
+.aider*

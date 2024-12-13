@@ -1,0 +1,489 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="chat-wrapper">
+    <!-- Add Toggle Button -->
+    <div class="search-settings">
+        <div class="settings-group">
+            <label for="vectorRepresentation">Vector Representation:</label>
+            <select id="vectorRepresentation" class="form-select form-select-sm">
+                <option value="nanobert">NanoBERT</option>
+                <option value="openai">OpenAI</option>
+            </select>
+        </div>
+        <div class="settings-group">
+            <label for="segmentationStrategy">Segmentation Strategy:</label>
+            <select id="segmentationStrategy" class="form-select form-select-sm">
+                <option value="recursive">Recursive</option>
+                <option value="standard">Standard</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Chat Container -->
+    <div class="chat-scroll-area">
+        <div class="chat-container container-fluid" id="chatContainer">
+            <div class="assistant-message">
+            <p>Please describe the topics or content of the nanoscience papers you want to search for.</p>  
+            <p>A more descriptive query will improve the quality of the search. IE: "gold nanoparticles for plasmonic sensing" will be more accurate than "gold nanoparticles".</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Input Bar -->
+    <div class="input-bar">
+        <div class="container-fluid">
+            <div class="input-group">
+                <input type="text" id="userInput" class="form-control" placeholder="Type your message...">
+                <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .chat-wrapper {
+        position: fixed;
+        top: 56px; /* Height of navbar */
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chat-scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem 1.5rem;
+    }
+
+    .chat-container {
+        min-height: min-content;
+        display: flex;
+        flex-direction: column;
+        padding-top: 0.5rem;
+    }
+
+    .input-bar {
+        background-color: white;
+        border-top: 1px solid #dee2e6;
+        padding: 1rem;
+    }
+
+    .user-message {
+        background-color: #e9ecef;
+        border-radius: 15px;
+        padding: 10px;
+        margin: 5px 0;
+        max-width: 80%;
+        margin-left: auto;
+        word-wrap: break-word;
+    }
+    
+    .assistant-message {
+        background-color: #f8f9fa;
+        border-radius: 15px;
+        padding: 10px;
+        margin: 5px 0;
+        max-width: 80%;
+        word-wrap: break-word;
+    }
+
+    /* Loading animation styles */
+    .loading-message {
+        background-color: #f8f9fa;
+        border-radius: 15px;
+        padding: 10px;
+        margin: 5px 0;
+        max-width: 80%;
+        word-wrap: break-word;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .loading-dots {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .loading-dots span {
+        width: 8px;
+        height: 8px;
+        background-color: #6c757d;
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out;
+    }
+
+    .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+        0%, 80%, 100% { transform: scale(0); }
+        40% { transform: scale(1); }
+    }
+
+    /* Add these styles */
+    .search-settings {
+        position: fixed;
+        top: 70px;  /* Below navbar */
+        right: 20px;
+        z-index: 1000;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .settings-group {
+        margin-bottom: 0.5rem;
+    }
+    
+    .settings-group:last-child {
+        margin-bottom: 0;
+    }
+    
+    .settings-group label {
+        display: block;
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+        color: #6c757d;
+    }
+    
+    .settings-group select {
+        width: 200px;
+        font-size: 0.9rem;
+        border-color: #dee2e6;
+    }
+    
+    .settings-group select option[disabled] {
+        color: #6c757d;
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set initial dropdown selections based on session data
+    document.addEventListener('DOMContentLoaded', function() {
+        const vectorRep = document.getElementById('vectorRepresentation');
+        const segStrategy = document.getElementById('segmentationStrategy');
+
+        fetch('/get_current_settings')
+            .then(response => response.json())
+            .then(data => {
+                vectorRep.value = data.embedding_type;
+                segStrategy.value = data.using_recursive ? 'recursive' : 'standard';
+            })
+            .catch(error => console.error('Error fetching current settings:', error));
+    });
+    document.getElementById('vectorRepresentation').addEventListener('change', function() {
+        this.disabled = true;
+        
+        // Add loading message
+        const loadingDiv = createLoadingMessage("Switching Databases");
+        chatContainer.appendChild(loadingDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        fetch('/toggle_embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                toggle_type: 'vector_representation'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading message
+            loadingDiv.remove();
+
+            if (data.success) {
+                // Update stats message
+                const chatContainer = document.getElementById('chatContainer');
+                const firstMessage = chatContainer.firstChild;
+                
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    <strong>FAISS DB:</strong> ${data.embedding_type === 'openai' ? 'openai-embeddings' : 
+                        (data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings')}<br>
+                    Number of FAISS vectors: ${data.vector_count}<br>
+                    Number of unique papers: ${data.unique_dois}<br>
+                    Vector Dimensions: ${data.vector_dim}
+                `;
+                
+                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                    chatContainer.replaceChild(statsDiv, firstMessage);
+                } else {
+                    chatContainer.insertBefore(statsDiv, firstMessage);
+                }
+
+                // Update segmentation strategy options
+                const segStrategy = document.getElementById('segmentationStrategy');
+                if (data.embedding_type === 'openai') {
+                    segStrategy.innerHTML = '<option value="standard" selected>Standard</option>';
+                } else {
+                    segStrategy.innerHTML = `
+                        <option value="recursive" ${data.using_recursive ? 'selected' : ''}>Recursive</option>
+                        <option value="standard" ${!data.using_recursive ? 'selected' : ''}>Standard</option>
+                    `;
+                }
+            } else {
+                alert(data.error || 'Failed to toggle vector representation');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error toggling vector representation');
+        })
+        .finally(() => {
+            this.disabled = false;
+        });
+    });
+
+    function isValidResult(result) {
+        // Check if title exists and is not empty
+        if (!result.title || result.title === '[]' || result.title.length === 0) return false;
+        // Check if DOI exists and is not empty
+        if (!result.doi || result.doi === '[]' || result.doi.length === 0) return false;
+        // Check if title isn't just "Title:" or similar
+        if (result.title.trim().toLowerCase() === 'title:') return false;
+        return true;
+    }
+
+    function formatTitle(title) {
+        // Remove square brackets and quotes
+        title = title.replace(/[\[\]'"]/g, '').trim();
+        // Return null if title is invalid
+        if (!title || title.toLowerCase() === 'title:') return null;
+        return `<a href="https://www.google.com/search?q=${encodeURIComponent(title)}" target="_blank">${title}</a>`;
+    }
+
+    function formatDOI(doi) {
+        // Remove square brackets, quotes, and trim
+        doi = doi.replace(/[\[\]'"]/g, '').trim();
+        // Remove 'a' prefix and '.html' suffix
+        doi = doi.replace(/^a/, '').replace(/\.html$/, '');
+        // Replace underscores with forward slashes
+        return doi.replace(/_/g, '/');
+    }
+
+    function formatResult(result) {
+        const title = formatTitle(result.title);
+        if (!title) return null; // Skip if title is invalid
+
+        const doi = formatDOI(result.doi);
+        if (!doi) return null; // Skip if DOI is invalid
+
+        return `
+            Title: ${title}<br>
+            DOI: ${doi}<br>
+            Distance: ${result.distance.toFixed(4)}<br><br>
+        `;
+    }
+
+    function createLoadingMessage(message = "Searching papers") {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading-message';
+        loadingDiv.innerHTML = `
+            ${message}
+            <div class="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        `;
+        return loadingDiv;
+    }
+
+    function sendMessage() {
+        const userInput = document.getElementById('userInput');
+        const chatContainer = document.getElementById('chatContainer');
+        const query = userInput.value.trim();
+        
+        if (!query) return;
+
+        // Add user message to chat
+        const userDiv = document.createElement('div');
+        userDiv.className = 'user-message';
+        userDiv.textContent = query;
+        chatContainer.appendChild(userDiv);
+        
+        // Add loading message
+        const loadingDiv = createLoadingMessage();
+        chatContainer.appendChild(loadingDiv);
+        
+        // Scroll to show loading animation
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        
+        // Clear input
+        userInput.value = '';
+
+        fetch('/search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                top_k: 5
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading message
+            loadingDiv.remove();
+            
+            const assistantDiv = document.createElement('div');
+            assistantDiv.className = 'assistant-message';
+            
+            if (data.error) {
+                assistantDiv.textContent = `Error: ${data.error}`;
+            } else {
+                // Filter and format results
+                const validResults = data.results
+                    .filter(isValidResult)
+                    .map(formatResult)
+                    .filter(result => result !== null)
+                    .join('');
+                
+                if (validResults) {
+                    // Get current segmentation strategy
+                    const segStrategy = document.getElementById('segmentationStrategy');
+                    const strategyText = segStrategy ? segStrategy.options[segStrategy.selectedIndex].text : 'Unknown';
+                    
+                    // Get current vector representation
+                    const vectorRep = document.getElementById('vectorRepresentation');
+                    const vectorText = vectorRep ? vectorRep.options[vectorRep.selectedIndex].text : 'Unknown';
+                    
+                    assistantDiv.innerHTML = `
+                        <strong>Top Responses</strong><br>
+                        <em>Vector Representation: ${vectorText}</em><br>
+                        <em>Segmentation Strategy: ${strategyText}</em><br><br>
+                        ${validResults}`;
+                } else {
+                    assistantDiv.textContent = 'No valid results found';
+                }
+            }
+            
+            chatContainer.appendChild(assistantDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        })
+        .catch(error => {
+            // Remove loading message
+            loadingDiv.remove();
+            
+            console.error('Error:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'assistant-message';
+            errorDiv.textContent = 'Error: Could not complete the search';
+            chatContainer.appendChild(errorDiv);
+        });
+    }
+
+    // Add event listener for Enter key
+    document.getElementById('userInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    document.getElementById('segmentationStrategy').addEventListener('change', function() {
+        console.log('Toggle button clicked');
+        
+        // Disable button during request
+        this.disabled = true;
+        console.log('Button disabled');
+        
+        fetch('/toggle_embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                toggle_type: 'segmentation_strategy'
+            })
+        })
+        .then(response => {
+            console.log('Response received:', response);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Data received:', data);
+            if (data.success) {
+                console.log('Toggle successful');
+                
+                // Get chat container
+                const chatContainer = document.getElementById('chatContainer');
+                if (!chatContainer) {
+                    throw new Error('Chat container not found');
+                }
+                
+                // Create new stats message
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'assistant-message';
+                statsDiv.innerHTML = `
+                    <strong>Database Statistics</strong><br>
+                    <strong>FAISS DB:</strong> ${data.using_recursive ? 'recursive_paragraph_embeddings' : 'paragraph_embeddings'}<br>
+                    Number of FAISS Vectors: ${data.vector_count}<br>
+                    Number of Unique DOIs: ${data.unique_dois}<br>
+                    Vector Dimensions: ${data.vector_dim}<br><br>
+                `;
+                
+                // Find and update first message
+                const firstMessage = chatContainer.firstChild;
+                if (firstMessage && firstMessage.classList && firstMessage.classList.contains('assistant-message')) {
+                    chatContainer.replaceChild(statsDiv, firstMessage);
+                } else {
+                    chatContainer.insertBefore(statsDiv, firstMessage);
+                }
+            } else {
+                console.error('Toggle failed:', data.error);
+                throw new Error(data.error || 'Toggle failed');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert(`Error toggling embeddings: ${error.message}`);
+        })
+        .finally(() => {
+            // Re-enable button
+            this.disabled = false;
+            console.log('Button re-enabled');
+        });
+    });
+    function initializeChatWithDBInfo() {
+        // Get chat container
+        const chatContainer = document.getElementById('chatContainer');
+        if (!chatContainer) {
+            console.error('Chat container not found');
+            return;
+        }
+
+        // Create new stats message with default values
+        const statsDiv = document.createElement('div');
+        statsDiv.className = 'assistant-message';
+        statsDiv.innerHTML = `
+            <strong>Database Statistics</strong><br>
+            <strong>FAISS DB:</strong> openai-embeddings<br>
+            Number of FAISS Vectors: ${faissCount}<br>
+            Vector Dimensions: ${vectorDim}
+        `;
+
+        // Add stats message to chat
+        chatContainer.appendChild(statsDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+</script>
+{% endblock %} 

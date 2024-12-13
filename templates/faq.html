@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}FAQ - NanoSearch{% endblock %}
+
+{% block content %}
+<div id="faq-root"></div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .faq-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1.5rem;
+    }
+
+    .faq-list {
+        margin-top: 1.5rem;
+    }
+
+    .faq-item {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .faq-item:last-child {
+        border-bottom: none;
+    }
+
+    /* Smaller heading sizes */
+    .faq-container h1 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .faq-item h2 {
+        color: #2c3e50;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    /* Smaller paragraph text */
+    .faq-item p {
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    /* Adjust link sizes */
+    .faq-item a {
+        font-size: 0.95rem;
+    }
+
+    /* Add responsive padding */
+    @media (max-width: 768px) {
+        .faq-container {
+            padding: 0 1rem;
+            margin: 1rem auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<!-- React Development Scripts -->
+<script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+
+<!-- Load the FAQ Component -->
+<script src="{{ url_for('static', filename='js/FAQPage.jsx') }}" type="text/javascript"></script>
+
+<!-- Initialize the App -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const rootElement = document.getElementById('faq-root');
+        if (rootElement) {
+            ReactDOM.render(React.createElement(FAQPage), rootElement);
+        } else {
+            console.error('FAQ root element not found');
+        }
+    });
+</script>
+{% endblock %} 
